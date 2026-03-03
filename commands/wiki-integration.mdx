@@ -1,0 +1,352 @@
+---
+title: 'Wiki Integration'
+description: 'Fandom wiki linking, role synchronization, and trivia commands for ALTER EGO and other wikis'
+icon: 'book'
+---
+
+Wiki integration commands connect Discord users with their Fandom accounts and sync roles based on wiki permissions.
+
+## /link
+
+Link your Discord account to your Fandom wiki account.
+
+<ParamField path="fandomusername" type="String" required>
+  Your username on Fandom (case-sensitive)
+</ParamField>
+
+### Linking Process
+
+<Steps>
+  <Step title="Username Verification">
+    Queries MediaWiki API to verify the username exists
+    
+    ```typescript
+    // From link.ts:75
+    const userQueryUrl = `https://alter-ego.fandom.com/api.php?action=query&format=json&list=users&ususers=${encodeURIComponent(fandomUsernameInput)}`;
+    ```
+  </Step>
+  
+  <Step title="Discord Handle Check">
+    Fetches user profile data to verify Discord handle is set
+    
+    ```typescript
+    // From link.ts:139
+    const userProfileUrl = `https://alter-ego.fandom.com/wikia.php?controller=UserProfile&method=getUserData&format=json&userId=${fandomUserId}`;
+    ```
+  </Step>
+  
+  <Step title="Handle Verification">
+    Compares Discord handle on Fandom with current Discord username
+  </Step>
+  
+  <Step title="Confirmation">
+    60-second confirmation button to finalize linking
+  </Step>
+  
+  <Step title="Role Sync">
+    Automatically grants Discord roles based on Fandom groups
+  </Step>
+</Steps>
+
+### Discord Handle Setup
+
+If Discord handle is not set or mismatched, users are directed to Special:VerifyUser:
+
+```typescript
+// From link.ts:151
+const verifyUrl = `https://alter-ego.fandom.com/wiki/Special:VerifyUser/${encodeURIComponent(canonicalFandomUsername)}?user=${encodeURIComponent(interaction.user.username)}&c=wb&ch=verify-me&useskin=fandomdesktop`;
+```
+
+### Role Mapping
+
+Fandom groups are automatically mapped to Discord roles:
+
+<AccordionGroup>
+  <Accordion title="Staff Roles">
+    - `sysop` → Alterministrator
+    - `bureaucrat` → Bureaucrat  
+    - `content-moderator` → Content Moderator
+    - `threadmoderator` → Discussions Moderator
+  </Accordion>
+  
+  <Accordion title="Contributor Roles">
+    Top 5 weekly contributors automatically receive the Top Contributors role
+  </Accordion>
+</AccordionGroup>
+
+### Important Notes
+
+<Warning>
+  Linking is **permanent** and cannot be undone without administrator intervention. A confirmation step prevents accidental linking.
+</Warning>
+
+<Note>
+  The linking check is case-sensitive for usernames but case-insensitive for Discord handle matching.
+</Note>
+
+---
+
+## /checklink
+
+Check if a user is linked and synchronize their roles.
+
+<ParamField path="user" type="User">
+  User to check (defaults to command executor)
+</ParamField>
+
+### Functionality
+
+<Tabs>
+  <Tab title="Linked Users">
+    For users with an existing link:
+    
+    1. Displays link information (Discord user, Fandom username, link date)
+    2. Fetches current Fandom groups from MediaWiki API
+    3. Synchronizes Discord roles based on groups
+    4. Checks top contributor status
+    5. Shows all granted/removed roles
+  </Tab>
+  
+  <Tab title="Unlinked Users">
+    Shows a simple status embed indicating the user has no Fandom link
+  </Tab>
+</Tabs>
+
+### Role Synchronization
+
+```typescript
+// From checklink.ts:136-142
+const roleResult = await FandomRoleManager.manageFandomRoles(
+  targetMember,
+  fandomGroups,
+  interaction.guild,
+  existingLink.fandomUsername,
+);
+grantedRoleNames = roleResult.grantedRoleNames;
+failedRoleNames = roleResult.failedRoleNames;
+```
+
+The sync process:
+- Grants roles for groups the user has
+- Removes roles for groups the user no longer has
+- Reports any failures (missing roles, permission errors)
+
+### Top Contributor Check
+
+```typescript
+// From checklink.ts:152-156
+topContributorResult =
+  await TopContributorsManager.manageTopContributorRole(
+    targetMember,
+    existingLink.fandomUsername,
+  );
+```
+
+Fetches weekly contribution data and:
+- Grants role if user is in top 5
+- Shows current rank
+- Removes role if no longer in top 5
+
+### Display Format
+
+Embed shows:
+- Discord username and tag
+- Fandom username
+- Link timestamp
+- Synchronized roles (with role mentions)
+- Top contributor rank (if applicable)
+- Fandom groups
+- Any errors encountered
+
+---
+
+## /syncroles
+
+Manually synchronize all linked users' roles.
+
+<Note>
+  This command requires specific permissions. Check the role permissions system for access requirements.
+</Note>
+
+### Sync Process
+
+<Steps>
+  <Step title="Fetch All Links">
+    Retrieves all Discord-Fandom links from the database
+  </Step>
+  
+  <Step title="Process Each User">
+    For each linked user:
+    - Fetch current Fandom groups
+    - Update Discord roles
+    - Check top contributor status
+    - Log any errors
+  </Step>
+  
+  <Step title="Wiki Sync">
+    Sends role data to wiki for cross-platform integration
+  </Step>
+  
+  <Step title="Report Results">
+    Displays statistics and any errors encountered
+  </Step>
+</Steps>
+
+### Implementation
+
+```typescript
+// From syncroles.ts:51-56
+const result = await TopContributorsManager.syncAllTopContributorRoles(
+  interaction.guild,
+);
+const wikiSyncResult = await WikiRoleSyncManager.syncRolesToWiki(
+  interaction.guild,
+);
+```
+
+### Statistics Reported
+
+- **Linked Users Processed** - Total users checked
+- **Roles Granted** - New roles added
+- **Roles Removed** - Outdated roles removed  
+- **Errors Encountered** - Failed operations
+- **Wiki Sync Status** - Success/failure of wiki integration
+
+### Error Handling
+
+Errors are logged and displayed in the response:
+
+```typescript
+// From syncroles.ts:87-97
+if (result.errors.length > 0) {
+  const errorSample = result.errors.slice(0, 3).join("\n");
+  const additionalErrors =
+    result.errors.length > 3
+      ? `\n... and ${result.errors.length - 3} more errors`
+      : "";
+
+  embed.addFields({
+    name: "⚠️ ERRORS ENCOUNTERED",
+    value: `\`\`\`${errorSample}${additionalErrors}\`\`\``,
+  });
+}
+```
+
+---
+
+## /trivia
+
+Fetch random trivia facts from wiki pages.
+
+<ParamField path="game" type="String (Choice)">
+  Wiki to fetch trivia from
+  
+  Options:
+  - **ALTER EGO** (default)
+  - **Tower Defense Simulator**
+</ParamField>
+
+### Wiki Sources
+
+<Tabs>
+  <Tab title="ALTER EGO">
+    **Source:** `https://alter-ego.fandom.com/wiki/ALTERPEDIA/DYK?action=raw`
+    
+    **Color:** #e61f24 (ALTER EGO red)
+    
+    **Footer:** "Verily, I have drawn forth this knowledge from the annals of ALTERPEDIA."
+  </Tab>
+  
+  <Tab title="Tower Defense Simulator">
+    **Source:** `https://tds.fandom.com/wiki/Template:DYKBoxContent?action=raw`
+    
+    **Color:** #33577A (TDS blue)
+    
+    **Footer:** "Verily, I have drawn forth this knowledge from the annals of TDS Wiki."
+  </Tab>
+</Tabs>
+
+### Trivia Format
+
+Facts are stored in wiki pages using `<option>` tags:
+
+```html
+<option>Fact text here with [[wiki links]] and '''formatting'''</option>
+```
+
+### Processing
+
+```typescript
+// From trivia.ts:8-12
+function cleanWikitext(text: string): string {
+  text = text.replace(/\[\[([^|\]]+\|)?([^\]]+)\]\]/g, "$2"); // Remove wiki links
+  text = text.replace(/'''([^']+)'''/g, "$1"); // Remove bold
+  text = text.replace(/''([^']+)''/g, "$1"); // Remove italic
+  return text;
+}
+```
+
+### Example Response
+
+```
+📚 Did you know that in ALTER EGO:
+
+The Watcher is the only character who can see through the Fourth Wall, making them aware of the player's existence.
+
+Verily, I have drawn forth this knowledge from the annals of ALTERPEDIA.
+```
+
+### Error Handling
+
+If trivia fetch fails:
+- Logs error to console
+- Shows ephemeral error message
+- Suggests trying again later
+
+<Note>
+  Trivia facts are randomly selected from all available options each time the command is used.
+</Note>
+
+---
+
+## API Integration Details
+
+### MediaWiki API Queries
+
+All wiki integration uses the MediaWiki Action API:
+
+```typescript
+// User query
+`https://alter-ego.fandom.com/api.php?action=query&format=json&list=users&ususers=${username}&usprop=groups|gender|registration|editcount`
+
+// User profile  
+`https://alter-ego.fandom.com/wikia.php?controller=UserProfile&method=getUserData&format=json&userId=${userId}`
+```
+
+### Response Interfaces
+
+```typescript
+interface FandomUserQueryUser {
+  userid: number;
+  name: string;
+  missing?: string;
+  groups?: string[];
+  editcount?: number;
+  registration?: string;
+  gender?: string;
+}
+
+interface FandomUserProfileData {
+  id: number;
+  username: string;
+  discordHandle?: string;
+}
+```
+
+### Top Contributors API
+
+Fetches weekly contribution data to determine top 5 contributors for role assignment.
+
+<Warning>
+  All wiki integration commands require the bot to be in a guild context. They cannot be used in DMs.
+</Warning>

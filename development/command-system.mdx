@@ -1,0 +1,636 @@
+---
+title: 'Command System'
+description: 'How to create and add new commands to the Aphonos bot'
+---
+
+## Command Structure
+
+Aphonos uses Discord.js slash commands with a modular architecture. Each command is a separate TypeScript module that exports a `data` object and an `execute` function.
+
+## Command Interface
+
+All commands must implement the `Command` interface defined in `src/utils/commandLoader.ts:35`:
+
+```typescript
+export interface Command {
+  data: any;  // SlashCommandBuilder instance
+  execute: (...args: any[]) => Promise<void>;
+}
+```
+
+## Basic Command Template
+
+Here's the minimal structure for a new command:
+
+```typescript
+import {
+  ChatInputCommandInteraction,
+  SlashCommandBuilder,
+  MessageFlags,
+} from "discord.js";
+
+export const data = new SlashCommandBuilder()
+  .setName("commandname")
+  .setDescription("Command description");
+
+export async function execute(
+  interaction: ChatInputCommandInteraction,
+): Promise<void> {
+  try {
+    await interaction.reply({
+      content: "Command response",
+    });
+  } catch (error) {
+    console.error("Error executing command:", error);
+    await interaction.reply({
+      content: "An error occurred!",
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+}
+```
+
+## Real-World Examples
+
+### Simple Command: Avatar
+
+From `src/commands/avatar.ts`, a basic utility command:
+
+```typescript
+import {
+  ChatInputCommandInteraction,
+  SlashCommandBuilder,
+  EmbedBuilder,
+  MessageFlags,
+  User,
+} from "discord.js";
+
+export const data = new SlashCommandBuilder()
+  .setName("avatar")
+  .setDescription("Behold the visage of a soul")
+  .addUserOption((option) =>
+    option
+      .setName("user")
+      .setDescription("The soul whose visage thou seekest to view")
+      .setRequired(false),
+  );
+
+export async function execute(
+  interaction: ChatInputCommandInteraction,
+): Promise<void> {
+  const rawTargetUser = interaction.options.getUser("user") || interaction.user;
+
+  try {
+    const targetUser: User = await rawTargetUser.fetch(true);
+    const isAnimatedAvatar = targetUser.avatar?.startsWith("a_");
+    const avatarURL = targetUser.displayAvatarURL({
+      size: 512,
+      extension: isAnimatedAvatar ? "gif" : "png",
+    });
+
+    const embed = new EmbedBuilder()
+      .setColor(targetUser.hexAccentColor || "#B2BEB5")
+      .setTitle(`🖼️ VISAGE OF ${targetUser.tag.toUpperCase()}`)
+      .setDescription(`[View Avatar](${avatarURL})`)
+      .setImage(avatarURL);
+
+    await interaction.reply({ embeds: [embed] });
+  } catch (error) {
+    console.error("Error displaying avatar:", error);
+    await interaction.reply({
+      content: "Failed to retrieve user's visage!",
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+}
+```
+
+### Moderation Command: Kick
+
+From `src/commands/kick.ts`, showing moderation with logging:
+
+```typescript
+import {
+  ChatInputCommandInteraction,
+  SlashCommandBuilder,
+  GuildMember,
+  EmbedBuilder,
+  MessageFlags,
+} from "discord.js";
+import { ModerationLogger } from "../utils/moderationLogger.js";
+
+export const data = new SlashCommandBuilder()
+  .setName("kick")
+  .setDescription("Cast out those who defy sacred Alteruism")
+  .addUserOption((option) =>
+    option
+      .setName("user")
+      .setDescription("The soul to be cast out")
+      .setRequired(true),
+  )
+  .addStringOption((option) =>
+    option
+      .setName("reason")
+      .setDescription("Reason for holy judgement")
+      .setRequired(false),
+  );
+
+export async function execute(
+  interaction: ChatInputCommandInteraction,
+  executor: GuildMember,
+): Promise<void> {
+  const targetUser = interaction.options.getUser("user")!;
+  const reason =
+    interaction.options.getString("reason") || "Defiance of sacred Alteruism";
+
+  const targetMember = interaction.guild?.members.cache.get(targetUser.id);
+  if (!targetMember) {
+    await interaction.reply({
+      content: "**THE FAITHLESS ONE HATH ALREADY FLED!**",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  try {
+    // Try to DM the user before kicking
+    try {
+      await targetUser.send(
+        `**THOU HAST BEEN CAST OUT FROM THE ALTER EGO WIKI!\n\nReason: ${reason}**`,
+      );
+    } catch (dmError) {
+      console.log("[KICK] Failed to send DM to kicked user:", dmError);
+    }
+
+    await targetMember.kick(reason);
+
+    // Log the moderation action
+    const entryId = await ModerationLogger.addEntry({
+      type: "kick",
+      userId: targetUser.id,
+      userTag: targetUser.tag,
+      moderatorId: executor.id,
+      moderatorTag: executor.user.tag,
+      reason: reason,
+      guildId: interaction.guild.id,
+    });
+
+    const embed = new EmbedBuilder()
+      .setColor("#FF6B6B")
+      .setTitle("⚖️ RIGHTEOUS CORRECTION DELIVERED")
+      .setDescription(
+        `**${targetUser} hath been cast out!**`,
+      )
+      .addFields(
+        { name: "HAND OF JUDGEMENT", value: `${executor.user.tag}`, inline: true },
+        { name: "ACTION ID", value: `${entryId}`, inline: true },
+        { name: "REASON", value: reason, inline: false },
+      )
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed] });
+  } catch (error) {
+    await interaction.reply({
+      content: "**THE DIVINE POWERS HAVE BEEN THWARTED!**",
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+}
+```
+
+### Interactive Command: Help
+
+From `src/commands/help.ts`, showing button interactions:
+
+```typescript
+import {
+  ChatInputCommandInteraction,
+  SlashCommandBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+} from "discord.js";
+
+export const data = new SlashCommandBuilder()
+  .setName("help")
+  .setDescription("Display sacred instruments available to the faithful");
+
+export async function execute(
+  interaction: ChatInputCommandInteraction,
+): Promise<void> {
+  let currentPage = 0;
+  const totalPages = 5;
+
+  const embed = createEmbed(currentPage);
+  const buttons = createButtons(currentPage, totalPages);
+
+  const response = await interaction.reply({
+    embeds: [embed],
+    components: [buttons],
+  });
+
+  const collector = response.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: 300000, // 5 minutes
+  });
+
+  collector.on("collect", async (buttonInteraction) => {
+    if (buttonInteraction.user.id !== interaction.user.id) {
+      await buttonInteraction.reply({
+        content: "**Thou cannot control another's commandments!**",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    switch (buttonInteraction.customId) {
+      case "first":
+        currentPage = 0;
+        break;
+      case "previous":
+        currentPage = Math.max(0, currentPage - 1);
+        break;
+      case "next":
+        currentPage = Math.min(totalPages - 1, currentPage + 1);
+        break;
+      case "last":
+        currentPage = totalPages - 1;
+        break;
+    }
+
+    const newEmbed = createEmbed(currentPage);
+    const newButtons = createButtons(currentPage, totalPages);
+
+    await buttonInteraction.update({
+      embeds: [newEmbed],
+      components: [newButtons],
+    });
+  });
+}
+```
+
+## Adding a New Command
+
+<Steps>
+  <Step title="Create Command File">
+    Create a new TypeScript file in `src/commands/`:
+    
+    ```bash
+    touch src/commands/mycommand.ts
+    ```
+  </Step>
+
+  <Step title="Implement Command Logic">
+    Write your command following the Command interface:
+    
+    ```typescript
+    import {
+      ChatInputCommandInteraction,
+      SlashCommandBuilder,
+      MessageFlags,
+    } from "discord.js";
+
+    export const data = new SlashCommandBuilder()
+      .setName("mycommand")
+      .setDescription("What my command does");
+
+    export async function execute(
+      interaction: ChatInputCommandInteraction,
+    ): Promise<void> {
+      try {
+        await interaction.reply({
+          content: "Command works!",
+        });
+      } catch (error) {
+        console.error("Error:", error);
+        await interaction.reply({
+          content: "Error occurred!",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Register in Command Loader">
+    Add your command to `src/utils/commandLoader.ts`:
+    
+    ```typescript
+    // At the top with other imports
+    import * as mycommand from "../commands/mycommand.js";
+
+    // In the commandModules array
+    const commandModules = [
+      kick,
+      ban,
+      // ... other commands
+      mycommand,  // Add your command here
+    ];
+    ```
+    
+    <Warning>
+      Remember to use `.js` extension in imports even though the file is `.ts`! This is required for ES modules.
+    </Warning>
+  </Step>
+
+  <Step title="Build and Test">
+    Rebuild the bot and test your command:
+    
+    ```bash
+    npm run build
+    npm start
+    ```
+    
+    Or use development mode with auto-reload:
+    
+    ```bash
+    npm run dev
+    ```
+  </Step>
+
+  <Step title="Add to Help Command (Optional)">
+    If you want your command to appear in `/help`, add it to the commands array in `src/commands/help.ts`:
+    
+    ```typescript
+    const commands: CommandInfo[] = [
+      // ... other commands
+      {
+        name: "/mycommand",
+        value: "What my command does",
+        category: "basic1",  // or "admin", "moderator", etc.
+      },
+    ];
+    ```
+  </Step>
+</Steps>
+
+## Command Options
+
+Discord.js provides various option types:
+
+### String Option
+
+```typescript
+.addStringOption((option) =>
+  option
+    .setName("text")
+    .setDescription("Some text")
+    .setRequired(true)
+)
+```
+
+### User Option
+
+```typescript
+.addUserOption((option) =>
+  option
+    .setName("user")
+    .setDescription("Select a user")
+    .setRequired(true)
+)
+```
+
+### Integer Option
+
+```typescript
+.addIntegerOption((option) =>
+  option
+    .setName("amount")
+    .setDescription("A number")
+    .setRequired(true)
+    .setMinValue(1)
+    .setMaxValue(100)
+)
+```
+
+### Boolean Option
+
+```typescript
+.addBooleanOption((option) =>
+  option
+    .setName("public")
+    .setDescription("Make response public")
+    .setRequired(false)
+)
+```
+
+### Choice Option
+
+```typescript
+.addStringOption((option) =>
+  option
+    .setName("mode")
+    .setDescription("Select mode")
+    .setRequired(true)
+    .addChoices(
+      { name: "Normal", value: "normal" },
+      { name: "Hard", value: "hard" },
+      { name: "Extreme", value: "extreme" },
+    )
+)
+```
+
+## Subcommands
+
+For complex commands with multiple actions:
+
+```typescript
+export const data = new SlashCommandBuilder()
+  .setName("admin")
+  .setDescription("Admin commands")
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("ban")
+      .setDescription("Ban a user")
+      .addUserOption((option) =>
+        option.setName("user").setDescription("User to ban").setRequired(true)
+      )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("unban")
+      .setDescription("Unban a user")
+      .addStringOption((option) =>
+        option.setName("userid").setDescription("User ID").setRequired(true)
+      )
+  );
+
+export async function execute(
+  interaction: ChatInputCommandInteraction,
+): Promise<void> {
+  const subcommand = interaction.options.getSubcommand();
+
+  if (subcommand === "ban") {
+    // Handle ban
+  } else if (subcommand === "unban") {
+    // Handle unban
+  }
+}
+```
+
+## Command Execution Flow
+
+1. User invokes slash command in Discord
+2. Discord sends interaction to bot
+3. `handleInteraction()` receives the interaction (`src/utils/eventHandlers.ts:21`)
+4. Permission checks are performed:
+   - `CommandAccessManager.canUseCommand()` - Guild-level access
+   - `RolePermissions.hasCommandPermission()` - Role-based permissions
+   - `RolePermissions.canUseCommandInChannel()` - Channel restrictions
+5. Command is retrieved from the commands collection
+6. `command.execute()` is called with the interaction
+7. Command performs its logic and responds to the interaction
+
+## Best Practices
+
+### Always Handle Errors
+
+```typescript
+try {
+  // Command logic
+} catch (error) {
+  console.error("Error:", error);
+  await interaction.reply({
+    content: "An error occurred!",
+    flags: MessageFlags.Ephemeral,
+  });
+}
+```
+
+### Use Ephemeral for Errors
+
+Error messages should be private:
+
+```typescript
+await interaction.reply({
+  content: "Error message",
+  flags: MessageFlags.Ephemeral,  // Only visible to the user
+});
+```
+
+### Check for Null/Undefined
+
+```typescript
+const member = interaction.guild?.members.cache.get(userId);
+if (!member) {
+  await interaction.reply({
+    content: "Member not found!",
+    flags: MessageFlags.Ephemeral,
+  });
+  return;
+}
+```
+
+### Use Embeds for Rich Responses
+
+```typescript
+const embed = new EmbedBuilder()
+  .setColor("#00CED1")
+  .setTitle("Command Result")
+  .setDescription("Description here")
+  .addFields(
+    { name: "Field 1", value: "Value 1", inline: true },
+    { name: "Field 2", value: "Value 2", inline: true },
+  )
+  .setTimestamp();
+
+await interaction.reply({ embeds: [embed] });
+```
+
+### Handle Deferred Responses
+
+For long-running commands:
+
+```typescript
+await interaction.deferReply();
+
+// Do long operation
+await someAsyncOperation();
+
+// Then respond
+await interaction.editReply({
+  content: "Operation complete!",
+});
+```
+
+## Permission Levels
+
+Commands can be restricted by role level:
+
+- **Admin**: Alterministrator role only
+- **Moderator**: Moderator role and above
+- **Basic**: All users
+
+Permission checking is handled automatically by `RolePermissions` in the event handler.
+
+## Moderation Commands
+
+Moderation commands receive a second parameter:
+
+```typescript
+export async function execute(
+  interaction: ChatInputCommandInteraction,
+  executor: GuildMember,  // The member executing the command
+): Promise<void> {
+  // executor contains role and permission information
+}
+```
+
+Commands without the executor parameter:
+- `/help`
+- `/info`
+- `/sins`
+- `/avatar`
+- `/archives`
+- `/link`
+- `/checklink`
+- `/syncroles`
+
+## Testing Your Command
+
+1. Start the bot in development mode
+2. Use the command in your test Discord server
+3. Test various inputs and edge cases
+4. Verify error handling works
+5. Check that permissions are respected
+6. Ensure embeds display correctly
+7. Test on mobile and desktop clients
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Command not appearing in Discord">
+    - Ensure the command is registered in `commandLoader.ts`
+    - Rebuild the bot with `npm run build`
+    - Restart the bot
+    - Wait a few minutes for Discord to update slash commands
+    - Check console for registration errors
+  </Accordion>
+
+  <Accordion title="Permission errors">
+    - Verify the bot has required permissions in the server
+    - Check role hierarchy (bot role must be higher than target roles)
+    - Ensure permission checks are implemented correctly
+  </Accordion>
+
+  <Accordion title="Import errors with .js extension">
+    - TypeScript uses `.ts` files but imports must use `.js`
+    - This is required for ES module compatibility
+    - Example: `import * as mycommand from "../commands/mycommand.js";`
+  </Accordion>
+
+  <Accordion title="Interaction already replied error">
+    - Don't call `reply()` twice on the same interaction
+    - Use `editReply()` or `followUp()` after the initial reply
+    - Check if interaction was deferred before replying
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+- Review existing commands in `src/commands/` for more examples
+- Read the [Discord.js Guide](https://discordjs.guide/)
+- Check the [Discord.js Documentation](https://discord.js.org/)
+- Explore utility modules in `src/utils/` for helper functions

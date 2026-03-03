@@ -1,0 +1,314 @@
+---
+title: 'Contributing Guidelines'
+description: 'How to contribute to the Aphonos Discord bot project'
+---
+
+## Welcome Contributors
+
+Thank you for considering contributing to Aphonos! This bot serves the ALTER EGO Wiki and Tower Defense Simulator Wiki communities, and we welcome improvements, bug fixes, and new features.
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (v18 or higher recommended)
+- npm or yarn package manager
+- A Discord bot token (for testing)
+- Basic knowledge of TypeScript and Discord.js
+
+### Development Setup
+
+<Steps>
+  <Step title="Fork and Clone">
+    Fork the repository and clone it to your local machine:
+    
+    ```bash
+    git clone https://github.com/yourusername/aphonos-bot.git
+    cd aphonos-bot
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install all required dependencies:
+    
+    ```bash
+    npm install
+    ```
+  </Step>
+
+  <Step title="Configure Environment">
+    Create a `.env` file in the root directory:
+    
+    ```bash
+    DISCORD_TOKEN=your_bot_token_here
+    ```
+    
+    Get your bot token from the [Discord Developer Portal](https://discord.com/developers/applications).
+  </Step>
+
+  <Step title="Run in Development Mode">
+    Start the bot in development mode with auto-reload:
+    
+    ```bash
+    npm run dev
+    ```
+    
+    This uses `tsx` to run TypeScript directly without compilation.
+  </Step>
+</Steps>
+
+## Development Workflow
+
+### Building the Project
+
+Compile TypeScript to JavaScript:
+
+```bash
+npm run build
+```
+
+This compiles TypeScript files to the `dist/` directory and copies necessary image assets.
+
+### Running in Production Mode
+
+After building:
+
+```bash
+npm start
+```
+
+### Code Formatting
+
+Format code with Prettier:
+
+```bash
+npm run format
+```
+
+Ensure your code is properly formatted before submitting a pull request.
+
+## Code Style Guidelines
+
+### TypeScript Standards
+
+- Use TypeScript's strict mode (enabled by default)
+- Define proper types for all function parameters and return values
+- Use interfaces for complex object structures
+- Avoid `any` type unless absolutely necessary
+
+### Naming Conventions
+
+- **Files**: Use camelCase for command files (e.g., `battlestats.ts`, `reactionrole.ts`)
+- **Classes**: Use PascalCase (e.g., `AltershaperBot`, `LockManager`)
+- **Functions**: Use camelCase (e.g., `handleInteraction`, `loadCommands`)
+- **Constants**: Use SCREAMING_SNAKE_CASE (e.g., `WELCOME_CHANNEL_ID`)
+
+### Discord.js Best Practices
+
+- Always use `MessageFlags.Ephemeral` for error messages
+- Handle both replied and deferred interactions in error handlers
+- Use embeds for rich, formatted responses
+- Check for null/undefined before accessing guild members or channels
+
+### Error Handling
+
+All command execute functions should include try-catch blocks:
+
+```typescript
+export async function execute(
+  interaction: ChatInputCommandInteraction,
+  executor: GuildMember,
+): Promise<void> {
+  try {
+    // Command logic here
+  } catch (error) {
+    console.error("Error executing command:", error);
+    await interaction.reply({
+      content: "An error occurred!",
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+}
+```
+
+## Making Changes
+
+### Creating a New Branch
+
+Create a descriptive branch name:
+
+```bash
+git checkout -b feature/add-new-command
+# or
+git checkout -b fix/battle-lock-issue
+```
+
+### Commit Messages
+
+Use clear, descriptive commit messages:
+
+- **Good**: "Add /poll command for creating server polls"
+- **Good**: "Fix battle lock not releasing after timeout"
+- **Bad**: "Update files"
+- **Bad**: "Changes"
+
+Follow this format:
+- Start with a verb (Add, Fix, Update, Remove, Refactor)
+- Be specific about what changed
+- Keep it concise but descriptive
+
+### Testing Your Changes
+
+<AccordionGroup>
+  <Accordion title="Testing Commands">
+    1. Create a test Discord server
+    2. Invite your bot with appropriate permissions
+    3. Test the command with various inputs
+    4. Test error cases (invalid users, missing permissions, etc.)
+    5. Verify ephemeral messages appear correctly
+  </Accordion>
+
+  <Accordion title="Testing Permissions">
+    - Test with different role levels (admin, moderator, basic user)
+    - Verify permission checks work correctly
+    - Test in different channel types
+  </Accordion>
+
+  <Accordion title="Testing Error Handling">
+    - Test with missing parameters
+    - Test with invalid user IDs
+    - Test when bot lacks permissions
+    - Verify graceful error messages
+  </Accordion>
+</AccordionGroup>
+
+## Submitting a Pull Request
+
+<Steps>
+  <Step title="Ensure Code Quality">
+    Before submitting:
+    
+    - Run `npm run format` to format your code
+    - Ensure `npm run build` completes without errors
+    - Test your changes thoroughly
+  </Step>
+
+  <Step title="Push Your Changes">
+    ```bash
+    git add .
+    git commit -m "Add new feature description"
+    git push origin feature/your-branch-name
+    ```
+  </Step>
+
+  <Step title="Create Pull Request">
+    1. Go to the repository on GitHub
+    2. Click "New Pull Request"
+    3. Select your branch
+    4. Write a clear description of your changes
+    5. Include screenshots/examples if applicable
+  </Step>
+
+  <Step title="Address Review Feedback">
+    - Respond to reviewer comments
+    - Make requested changes
+    - Push updates to the same branch
+  </Step>
+</Steps>
+
+## Pull Request Checklist
+
+Before submitting, ensure:
+
+- [ ] Code follows the project's style guidelines
+- [ ] Code has been formatted with Prettier
+- [ ] TypeScript compiles without errors
+- [ ] Changes have been tested in a Discord server
+- [ ] Error handling is implemented
+- [ ] Permission checks are in place (if applicable)
+- [ ] Commit messages are clear and descriptive
+- [ ] No sensitive data (tokens, IDs) is committed
+
+## What to Contribute
+
+### Good First Contributions
+
+- Bug fixes for existing commands
+- Improving error messages
+- Adding input validation
+- Documentation improvements
+- Code comments for complex logic
+
+### Feature Additions
+
+- New moderation commands
+- Fun/utility commands
+- Improvements to existing features
+- Performance optimizations
+
+### Not Accepted
+
+- Breaking changes without discussion
+- Commands unrelated to the server's purpose
+- Code that violates Discord's Terms of Service
+- Malicious or harmful features
+
+## Required Bot Permissions
+
+When testing, ensure your bot has these permissions:
+
+| Permission | Purpose |
+|------------|----------|
+| Kick Members | `/kick` command |
+| Ban Members | `/ban` command |
+| Moderate Members | `/timeout` command |
+| Manage Messages | `/clear` command |
+| Send Messages | All commands |
+| Embed Links | Rich embed responses |
+| Read Message History | Message archiving |
+| Add Reactions | Reaction roles |
+| View Channels | Basic functionality |
+
+## Getting Help
+
+If you need help:
+
+1. Check the [documentation](https://alter-ego.fandom.com/wiki/Help:ALTERSHAPER)
+2. Review existing commands for examples
+3. Read the [Discord.js documentation](https://discord.js.org/)
+4. Open an issue for questions or clarifications
+
+## Code of Conduct
+
+- Be respectful and constructive in discussions
+- Focus on the code, not the person
+- Welcome newcomers and help them learn
+- Follow Discord's Terms of Service and Community Guidelines
+
+## License
+
+By contributing to Aphonos, you agree that your contributions will be licensed under the MIT License:
+
+```
+MIT License
+
+Copyright (c) 2025 t7ru
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+```
+
+This ensures the project remains open source and freely available to the community.
+
+## Questions?
+
+If you have any questions about contributing, feel free to open an issue or reach out to the maintainers.
+
+Thank you for helping make Aphonos better!

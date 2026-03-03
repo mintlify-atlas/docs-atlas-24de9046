@@ -1,0 +1,244 @@
+---
+title: 'Management Commands'
+description: 'Server management utilities including message clearing, archives, and slowmode'
+icon: 'cog'
+---
+
+Management commands help maintain server quality and organization without directly punishing users.
+
+## /clear
+
+Bulk delete messages from a channel with optional user filtering.
+
+<ParamField path="amount" type="Integer" required>
+  Number of messages to delete (1-100)
+</ParamField>
+
+<ParamField path="user" type="User">
+  Only delete messages from this specific user
+</ParamField>
+
+### Message Archival
+
+All cleared messages are automatically archived before deletion:
+
+```typescript
+// From clear.ts:80-88
+const tempActionId = `C${Date.now()}`;
+
+if (messagesArray.length > 0) {
+  await MessageLogger.logPurgedMessages(
+    messagesArray,
+    executor.user.tag,
+    tempActionId,
+  );
+}
+```
+
+The Action ID uses a timestamp format (e.g., `C1234567890`) for uniqueness.
+
+### Behavior
+
+<Steps>
+  <Step title="Fetch Messages">
+    Retrieves up to 100 messages from the channel
+  </Step>
+  
+  <Step title="Filter (Optional)">
+    If user specified, filters to only that user's messages
+  </Step>
+  
+  <Step title="Archive">
+    Logs all messages to the archive system with content, attachments, and metadata
+  </Step>
+  
+  <Step title="Delete">
+    Performs bulk deletion via Discord API
+  </Step>
+  
+  <Step title="Log">
+    Creates moderation log entry with Action ID
+  </Step>
+</Steps>
+
+### Example Usage
+
+<CodeGroup>
+
+```bash Delete last 50 messages
+/clear amount:50
+```
+
+```bash Delete specific user's messages
+/clear amount:100 user:@Spammer
+```
+
+</CodeGroup>
+
+<Warning>
+  Messages older than 14 days cannot be bulk deleted due to Discord API limitations. The command will skip these automatically.
+</Warning>
+
+---
+
+## /archives
+
+View archived messages from previous clear/purge operations.
+
+<ParamField path="actionid" type="String">
+  Specific Action ID to view (e.g., C1234567890)
+</ParamField>
+
+### Pagination System
+
+Displays 5 messages per page with navigation buttons:
+
+```typescript
+// From archives.ts:148-149
+const messagesPerPage = 5;
+const totalPages = Math.ceil(purgedMessages.length / messagesPerPage);
+```
+
+### Displayed Information
+
+For each archived message:
+- Author tag and user mention
+- Message content (truncated to 100 characters if longer)
+- Number of attachments
+- Number of embeds  
+- Original channel
+- Original timestamp
+- Purge date and executor
+- Action ID
+
+### Navigation Buttons
+
+<CardGroup cols={4}>
+  <Card title="⏮️ First" icon="backward-fast">
+    Jump to first page
+  </Card>
+  <Card title="◀️ Previous" icon="chevron-left">
+    Go back one page
+  </Card>
+  <Card title="Next ▶️" icon="chevron-right">
+    Go forward one page
+  </Card>
+  <Card title="Last ⏭️" icon="forward-fast">
+    Jump to last page
+  </Card>
+</CardGroup>
+
+### Example Implementation
+
+```typescript
+// From archives.ts:70-94
+function addMessagesToEmbed(embed: EmbedBuilder, messages: any[]): void {
+  for (const message of messages) {
+    const purgedDate = new Date(message.purgedAt).toLocaleDateString();
+    const originalDate = new Date(message.timestamp).toLocaleDateString();
+
+    let content = message.content;
+    if (content.length > 100) {
+      content = content.substring(0, 100) + "...";
+    }
+
+    let attachmentInfo = "";
+    if (message.attachments.length > 0) {
+      attachmentInfo = `\n**Attachments:** ${message.attachments.length} file(s)`;
+    }
+
+    embed.addFields({
+      name: `📜 Message by ${message.authorTag}`,
+      value: `**Content:** ${content || "[NO TEXT]"}${attachmentInfo}\n**Channel:** <#${message.channelId}>\n**Original Date:** ${originalDate}`,
+      inline: false,
+    });
+  }
+}
+```
+
+<Note>
+  Archives are displayed as ephemeral messages (only visible to the command user) to maintain privacy.
+</Note>
+
+---
+
+## /slowmode
+
+Set channel rate limiting (slowmode) to control message frequency.
+
+<ParamField path="seconds" type="Integer" required>
+  Slowmode duration in seconds (0-21600)
+  
+  Set to 0 to disable slowmode
+</ParamField>
+
+<ParamField path="reason" type="String">
+  Reason for enabling/disabling slowmode (defaults to "Maintaining sacred order")
+</ParamField>
+
+### Duration Limits
+
+- **Minimum:** 0 seconds (disabled)
+- **Maximum:** 21,600 seconds (6 hours)
+- Only works in guild text channels
+
+### Implementation
+
+```typescript
+// From slowmode.ts:57
+await channel.setRateLimitPerUser(seconds, reason);
+
+await ModerationLogger.addEntry({
+  type: "slowmode" as any,
+  userId: "N/A",
+  userTag: "N/A",
+  moderatorId: executor.id,
+  moderatorTag: executor.user.tag,
+  reason: `${seconds === 0 ? "Disabled" : "Set"} slowmode in #${channel.name}${seconds > 0 ? ` (${seconds}s)` : ""}`,
+  guildId: interaction.guild.id,
+  duration: seconds > 0 ? seconds : undefined,
+});
+```
+
+### Example Usage
+
+<CodeGroup>
+
+```bash Enable 5 second slowmode
+/slowmode seconds:5 reason:High activity period
+```
+
+```bash Enable 1 minute slowmode
+/slowmode seconds:60 reason:Reducing spam
+```
+
+```bash Disable slowmode
+/slowmode seconds:0
+```
+
+</CodeGroup>
+
+### Visual Feedback
+
+The response embed changes based on the action:
+
+<Tabs>
+  <Tab title="Enabled">
+    - **Color:** Gold (#FFD700)
+    - **Title:** ⛈️ RESTRAINT IMPOSED
+    - **Description:** Shows channel and duration
+    - **Wisdom:** "Patience brings wisdom, and wisdom brings understanding"
+  </Tab>
+  
+  <Tab title="Disabled">
+    - **Color:** Green (#00FF00)
+    - **Title:** 💨 RESTRAINT LIFTED  
+    - **Description:** Shows channel
+    - **Status:** "Slowmode disabled"
+    - **Wisdom:** "The faithful may once again speak freely"
+  </Tab>
+</Tabs>
+
+<Note>
+  Slowmode applies to all users except those with Manage Channel or Manage Messages permissions.
+</Note>

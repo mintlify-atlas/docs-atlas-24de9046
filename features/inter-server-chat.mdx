@@ -1,0 +1,336 @@
+---
+title: 'Inter-Server Chat'
+description: 'Connect channels across multiple Discord servers for seamless communication'
+icon: 'comments'
+---
+
+## Overview
+
+The Inter-Server Chat feature allows you to create chat pools that relay messages between channels across different Discord servers. This is perfect for multi-server communities, partnered servers, or coordinated networks.
+
+## How It Works
+
+### Chat Pools
+
+A **chat pool** is a named group of channels that relay messages to each other:
+
+1. Admin creates a pool with `/interchat create`
+2. Channels from different servers join the pool with `/interchat join`
+3. Messages sent in any pool channel are relayed to all other channels
+4. Messages are sent via webhooks to preserve sender identity
+
+### Message Relaying
+
+When a message is sent in a pool channel (interServerChat.ts:221):
+
+1. The bot detects it's in a configured pool
+2. Extracts message content, attachments, and context (replies/forwards)
+3. Creates webhooks in target channels (or uses existing ones)
+4. Relays the message with the sender's username and avatar
+5. Adds server name to distinguish origin: `Username • ServerName`
+
+<Info>
+  Messages are relayed using webhooks named "Aphonos Relay" to maintain sender identity and improve user experience.
+</Info>
+
+## Pool Management
+
+### Creating a Pool
+
+Create a new chat pool:
+
+```
+/interchat create name:global-chat
+```
+
+This creates a pool with a unique ID. You'll receive the pool ID and name, which you can share with other server admins.
+
+### Joining a Pool
+
+Connect the current channel to an existing pool:
+
+```
+/interchat join pool:global-chat
+```
+
+You can join by:
+- Pool name (e.g., `global-chat`)
+- Pool ID (UUID format)
+
+The bot checks:
+- Pool exists
+- Channel isn't already in another pool
+- Channel is a text channel
+
+### Leaving a Pool
+
+Disconnect the current channel from its pool:
+
+```
+/interchat leave
+```
+
+This removes only the current channel. Other channels in the pool remain connected.
+
+### Viewing Pools
+
+List all available chat pools:
+
+```
+/interchat list
+```
+
+Shows:
+- Pool name
+- Pool ID
+- Number of connected channels  
+- Creation timestamp
+
+### Pool Information
+
+Get detailed information about a specific pool:
+
+```
+/interchat info pool:global-chat
+```
+
+Displays:
+- Pool ID
+- Channel count
+- Creation date
+- List of connected channels with server names
+
+### Renaming a Pool
+
+Change a pool's name:
+
+```
+/interchat rename pool:old-name newname:new-name
+```
+
+Validates that the new name isn't already in use.
+
+### Deleting a Pool
+
+Permanently delete a chat pool:
+
+```
+/interchat delete pool:global-chat
+```
+
+<Warning>
+  Deleting a pool disconnects ALL channels. This action cannot be undone.
+</Warning>
+
+### Channel Status
+
+Check if the current channel is connected to a pool:
+
+```
+/interchat status
+```
+
+Shows:
+- Connected pool name
+- Number of other channels
+- List of connected channels
+
+## Message Features
+
+### Content Relaying
+
+The system relays multiple message types:
+
+- **Text messages**: Full content preserved
+- **Attachments**: Images, videos, files (via URL)
+- **Stickers**: Shown as `[Sticker: Name]`
+- **Embeds**: Shown as `[Embed]` (preview not relayed)
+- **Empty messages**: Shown as `[Empty message]`
+
+### Reply Context
+
+When replying to a message (interServerChat.ts:258):
+
+```
+> ↩️ **OriginalAuthor:** Original message preview
+Your reply text
+```
+
+The bot:
+1. Fetches the referenced message
+2. Extracts the first 360 characters
+3. Removes nested reply/forward prefixes
+4. Adds reply context to the relayed message
+
+### Forwarded Messages
+
+Forwarded messages include context (interServerChat.ts:235):
+
+```
+> 📨 **Forwarded message:** Preview of forwarded content
+Optional additional comment
+```
+
+Handles:
+- Message snapshots from Discord's forward feature
+- Attachments/embeds in forwarded messages
+- Truncates previews to 360 characters
+
+<Note>
+  Reply and forward context is preserved across servers, making conversations easier to follow.
+</Note>
+
+## Webhook System
+
+Aphonos uses webhooks for message relaying (interServerChat.ts:169):
+
+### Webhook Creation
+
+```typescript
+private static async getWebhook(channel: TextChannel): Promise<Webhook> {
+  const webhooks = await channel.fetchWebhooks();
+  let webhook = webhooks.find(
+    wh => wh.name === "Aphonos Relay" && wh.owner?.id === client.user?.id
+  );
+  
+  if (!webhook) {
+    webhook = await channel.createWebhook({
+      name: "Aphonos Relay",
+      avatar: client.user?.displayAvatarURL()
+    });
+  }
+  
+  return webhook;
+}
+```
+
+### Webhook Messages
+
+Relayed messages use:
+- **Username**: `DisplayName • ServerName`
+- **Avatar**: Original sender's Discord avatar
+- **Content**: Full message with context
+- **Attachments**: Original file URLs
+- **Mentions**: Disabled (`allowedMentions: { parse: [] }`)
+
+<Warning>
+  Mentions are disabled in relayed messages to prevent cross-server notification spam.
+</Warning>
+
+## Data Storage
+
+Pools are stored in `data/interserver_links.json`:
+
+```json
+{
+  "pools": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "global-chat",
+      "channels": [
+        {
+          "channelId": "123456789",
+          "guildId": "987654321"
+        }
+      ],
+      "createdAt": "2024-01-15T10:30:00.000Z"
+    }
+  ]
+}
+```
+
+### Data Persistence
+
+The `InterServerChat` class (interServerChat.ts:30):
+- Loads data on bot startup
+- Saves data after each modification
+- Creates the data directory if missing
+- Handles JSON parse errors gracefully
+
+## Implementation Details
+
+### Key Files
+
+- `src/commands/interchat.ts` - Command implementation (interchat.ts:1)
+- `src/utils/interServerChat.ts` - Core relay logic (interServerChat.ts:1)
+- Main bot file - Message event handling
+
+### Initialization
+
+The system initializes on bot startup:
+
+```typescript
+InterServerChat.initialize(client);
+```
+
+This loads pool configuration from disk.
+
+### Message Handling
+
+Messages are processed through:
+
+```typescript
+client.on('messageCreate', async (message: Message) => {
+  await InterServerChat.handleMessage(message);
+});
+```
+
+The handler:
+1. Ignores bot messages
+2. Checks if channel is in a pool
+3. Processes message content and context
+4. Relays to all other pool channels
+
+## Permissions
+
+### Bot Permissions
+
+Required in all pool channels:
+- **View Channel**: To see messages
+- **Send Messages**: To relay messages
+- **Manage Webhooks**: To create/use relay webhooks
+- **Read Message History**: To fetch reply context
+- **Attach Files**: To relay attachments
+
+### Command Permissions
+
+The `/interchat` command requires **Manage Channels** permission.
+
+<Info>
+  Only users with Manage Channels can create, modify, or delete pools. Regular users can only view their channel's status.
+</Info>
+
+## Best Practices
+
+1. **Clear pool names**: Use descriptive names that indicate purpose
+2. **Test in private channels**: Verify relay works before going public
+3. **Coordinate with partners**: Share pool IDs securely with trusted server admins
+4. **Monitor activity**: Watch for spam or inappropriate use
+5. **Set channel topics**: Let users know the channel is connected to other servers
+6. **Use dedicated channels**: Avoid connecting important announcement or moderation channels
+
+## Troubleshooting
+
+### Messages not relaying
+
+- Check the bot has Manage Webhooks permission in all pool channels
+- Verify all channels are still in the pool with `/interchat info`
+- Ensure the bot is online in all connected servers
+- Check for webhook creation errors in bot logs
+
+### "Failed to join pool"
+
+- The channel may already be in another pool (use `/interchat leave` first)
+- Verify you're using the correct pool name or ID
+- Ensure the channel is a text channel
+
+### Missing attachments or images
+
+Attachments are relayed by URL. If images don't load:
+- The original message may have been deleted
+- Discord CDN URLs may have expired
+- The target server may block external images
+
+### Reply context not showing
+
+The bot needs **Read Message History** permission to fetch replied-to messages.

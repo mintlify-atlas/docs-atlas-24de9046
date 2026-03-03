@@ -1,0 +1,99 @@
+---
+title: 'Commands Overview'
+description: 'Complete command system for the Aphonos Discord bot with moderation, management, fun, and wiki integration features'
+icon: 'terminal'
+---
+
+Aphonos provides a comprehensive slash command system organized into four main categories:
+
+## Command Categories
+
+<CardGroup cols={2}>
+  <Card title="Moderation Commands" icon="gavel" href="/commands/moderation">
+    Powerful tools for server moderation including ban, kick, timeout, and warn
+  </Card>
+  
+  <Card title="Management Commands" icon="cog" href="/commands/management">
+    Server management utilities for message clearing, archives, and slowmode
+  </Card>
+  
+  <Card title="Fun Commands" icon="gamepad" href="/commands/fun">
+    Entertainment features including aura calculations, battles, ship compatibility, and games
+  </Card>
+  
+  <Card title="Wiki Integration" icon="book" href="/commands/wiki-integration">
+    Fandom wiki linking, role synchronization, and trivia commands
+  </Card>
+</CardGroup>
+
+## Action ID System
+
+All moderation actions generate unique Action IDs for tracking and management:
+
+- **W#** - Warning actions (e.g., W1, W2, W3)
+- **K#** - Kick actions (e.g., K1, K2, K3)
+- **B#** - Ban actions (e.g., B1, B2, B3)
+- **T#** - Timeout actions (e.g., T1, T2, T3)
+- **C#** - Clear/purge actions (e.g., C1234567890)
+
+These IDs can be used with the `/removesin` command to revoke moderation actions and undo punishments where possible.
+
+## Permission Levels
+
+Commands are organized by required permissions:
+
+<AccordionGroup>
+  <Accordion title="Administrator Commands">
+    - `/ban` - Permanent ban
+    - `/removesin` - Revoke moderation actions
+    - `/syncroles` - Synchronize wiki roles
+  </Accordion>
+  
+  <Accordion title="Moderator Commands">
+    - `/kick` - Remove user from server
+    - `/timeout` - Temporary mute
+    - `/warn` - Issue warnings
+    - `/clear` - Bulk message deletion
+    - `/archives` - View deleted messages
+    - `/slowmode` - Rate limit channels
+  </Accordion>
+  
+  <Accordion title="General User Commands">
+    - All fun commands (aura, battle, ship, etc.)
+    - Wiki integration (link, checklink, trivia)
+    - Informational commands
+  </Accordion>
+</AccordionGroup>
+
+## Common Features
+
+### Ephemeral Responses
+
+Many commands use ephemeral replies that only the command user can see, keeping server channels clean.
+
+### Rich Embeds
+
+All commands use Discord embeds with color-coded feedback:
+- 🔴 Red/Dark Red - Bans and severe actions
+- 🟠 Orange - Warnings and alerts  
+- 🟡 Yellow - Timeouts and temporary actions
+- 🔵 Blue - Information and neutral actions
+- 🟢 Green - Success and positive actions
+
+### Thematic Language
+
+Aphonos uses a unique thematic voice inspired by ALTER EGO's lore, with references to "Alteruism," "divine powers," and "sacred halls" throughout command responses.
+
+## Getting Started
+
+To view all available commands in Discord, use:
+
+```
+/help
+```
+
+This will display a paginated list of all commands organized by category.
+
+<Note>
+  All slash commands are automatically registered with Discord when the bot starts. No manual setup is required.
+</Note>

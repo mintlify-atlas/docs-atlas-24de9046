@@ -1,0 +1,444 @@
+---
+title: 'Fun Commands'
+description: 'Entertainment features including aura, battle, ship, russian roulette, oracle, and furry detection'
+icon: 'gamepad'
+---
+
+Fun commands provide entertainment and interactive features for server members.
+
+## /aura
+
+Calculate a user's aura strength and generate fighter statistics based on their display name.
+
+<ParamField path="user" type="User">
+  User to read (defaults to command executor)
+</ParamField>
+
+### Aura System
+
+The aura percentage is calculated using a deterministic hash of the display name:
+
+```typescript
+// From aura.ts:85-86
+const percentage = calculateAuraPercentage(displayName);
+const level = calculateAuraLevel(percentage);
+```
+
+### Aura Levels
+
+| Level | Name | Percentage Range |
+|-------|------|------------------|
+| 0 | Vile | 0-8% |
+| 1 | Invisible | 9-16% |
+| 2 | Weak | 17-24% |
+| 3 | Frail | 25-32% |
+| 4 | Mid | 33-40% |
+| 5 | Noticed | 41-48% |
+| 6 | Vibrant | 49-56% |
+| 7 | Strong | 57-64% |
+| 8 | Radiant | 65-72% |
+| 9 | Legendary | 73-80% |
+| 10 | Mythical | 81-88% |
+| 11 | Omnipotent | 89-100% |
+
+### Fighter Statistics
+
+Generated stats include:
+- **HP** - Health points
+- **ATK** - Attack power
+- **DEF** - Defense rating
+- **SPD** - Speed/agility
+- **CRIT** - Critical hit chance
+- **Abilities** - Two random special abilities
+
+### Fighter Classes
+
+```typescript
+// From aura.ts:129-137
+function getFighterClass(level: number): string {
+  if (level === 0) return "Cursed Bum";
+  if (level <= 2) return "Recruit";
+  if (level <= 4) return "Hardened Fighter";
+  if (level <= 6) return "Decimator";
+  if (level <= 8) return "Egoistic Champion";
+  if (level <= 10) return "Living Weapon";
+  return "Ego's Chosen One";
+}
+```
+
+<Note>
+  Aura calculations are deterministic - the same display name will always produce the same results.
+</Note>
+
+---
+
+## /battle
+
+Simulate an epic turn-based combat between two users.
+
+<ParamField path="fighter1" type="User" required>
+  First warrior to enter the arena
+</ParamField>
+
+<ParamField path="fighter2" type="User" required>
+  Second warrior to challenge fate
+</ParamField>
+
+<ParamField path="ranked" type="String (Choice)">
+  Enable ranked mode (requires consent from both fighters)
+  
+  Options: "True" or "False"
+</ParamField>
+
+### Battle Mechanics
+
+<Steps>
+  <Step title="Consent Phase (Ranked Only)">
+    Both fighters must accept within 15 seconds
+  </Step>
+  
+  <Step title="Fighter Generation">
+    Stats generated from display names (90% aura for ranked)
+  </Step>
+  
+  <Step title="Speed Determination">
+    Higher speed goes first (+1% dodge per speed difference)
+  </Step>
+  
+  <Step title="Combat Simulation">
+    Turn-based combat with attacks, abilities, dodges, and blocks
+  </Step>
+  
+  <Step title="Victory">
+    Battle ends when HP reaches 0 or 55 turns pass
+  </Step>
+</Steps>
+
+### Combat Actions
+
+**Normal Attacks:**
+- Base damage = attacker's ATK
+- Critical hits: 1.8x damage
+- Defense reduces damage by DEF/2
+- 15% base dodge chance + speed bonus
+- 15% block chance (reduces damage by DEF)
+
+**Special Abilities (25% chance per turn):**
+
+Over 20 unique abilities including:
+- **Alter Ego Burst** - 1.5x ATK damage
+- **Ego Shield** - +10 DEF
+- **Shadow Clone** - 1.2x ATK damage + permanent +1 ATK
+- **Healing Light** - Restore 30% max HP
+- **Berserker Rage** - +6 ATK, -2 DEF
+- **Time Slow** - +6 SPD
+- **Freikugel** - 35 fixed damage, costs 10% HP
+- **Spectral Exonorator** - Swap all stats with opponent
+
+### Battle Arenas
+
+<Tabs>
+  <Tab title="Heavens">
+    Background: `deathbattle.png`
+    
+    Default arena with celestial theme
+  </Tab>
+  
+  <Tab title="Ruins">
+    Background: `deathbattle2.png`
+    
+    Used for all ranked battles
+  </Tab>
+  
+  <Tab title="Games">
+    Background: `deathbattle3.png`
+    
+    10% random chance for casual battles
+  </Tab>
+</Tabs>
+
+### Ranked Mode
+
+- Restricted to specific guild (ID: 1362084781134708907)
+- Both fighters must consent
+- All fighters adjusted to 90% aura
+- Results tracked in competitive ratings
+- Weighted score (WS) calculated based on wins/losses
+
+```typescript
+// From battle.ts:989-995
+await BattleStatsManager.recordBattle(
+  winner.user.id,
+  winner.user.tag,
+  loser.user.id,
+  loser.user.tag,
+  turn,
+  winner.hp,
+  winner.maxHp,
+  isRanked,
+  interaction.guildId || undefined,
+);
+```
+
+<Warning>
+  Only one battle can occur per server at a time. Fighters cannot participate in multiple battles simultaneously.
+</Warning>
+
+---
+
+## /ship
+
+Calculate compatibility between two users.
+
+<ParamField path="user1" type="User">
+  First user to ship (random if not specified)
+</ParamField>
+
+<ParamField path="user2" type="User">
+  Second user to ship (random if not specified)
+</ParamField>
+
+### Ship Calculation
+
+Compatibility is deterministically calculated from display names:
+
+```typescript
+// From ship.ts:46-58
+function calculateShipPercentage(name1: string, name2: string): number {
+  const realShipName = createRealShipName(name1, name2);
+  const combinedNames = realShipName.toLowerCase();
+  let hash = 0;
+
+  for (let i = 0; i < combinedNames.length; i++) {
+    const char = combinedNames.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash;
+  }
+
+  return Math.abs(hash) % 101;
+}
+```
+
+### Ship Name Generation
+
+Combines halves of both names:
+
+```typescript
+// From ship.ts:28-32
+function createShipName(name1: string, name2: string): string {
+  const firstHalf = name1.slice(0, Math.ceil(name1.length / 2));
+  const secondHalf = name2.slice(Math.floor(name2.length / 2));
+  return firstHalf + secondHalf;
+}
+```
+
+### Compatibility Ratings
+
+| Percentage | Rating | Flavor Text |
+|------------|--------|-------------|
+| 100% | Soulmates! 💗 | "The stars have aligned perfectly!" |
+| 95-99% | Perfect Couple! 😍 | "Written in the heavens above!" |
+| 80-94% | Pretty Good! 😳 | "Ego has blessed this pairing!" |
+| 60-79% | Great Match! 😊 | "There's potential here..." |
+| 40-59% | Maybe Not... 🙂 | "Perfectly balanced..." |
+| 20-39% | Not Too Great... 😕 | "The spirits advise distance..." |
+| 1-19% | Terrible Match... 😬 | "May Ego have mercy..." |
+| 0% | Would Beat Each Other... 💔 | "May Ego have mercy on their souls..." |
+
+### Visual Design
+
+Ship images use different backgrounds based on compatibility:
+- **≥60%:** Pink/romantic theme (`ship.png`)
+- **&lt;60%:** Gray/neutral theme (`ship2.png`)
+
+---
+
+## /russian
+
+Play Russian Roulette with another user.
+
+<ParamField path="target" type="User" required>
+  The user to challenge
+</ParamField>
+
+### Game Rules
+
+<Steps>
+  <Step title="Challenge & Consent">
+    Both players must accept within 15 seconds
+  </Step>
+  
+  <Step title="Setup">
+    One bullet randomly placed in 6 chambers
+  </Step>
+  
+  <Step title="Turns">
+    Players take turns choosing an action
+  </Step>
+  
+  <Step title="Game End">
+    Game ends when someone gets shot or 5 minutes elapse
+  </Step>
+</Steps>
+
+### Available Actions
+
+<CardGroup cols={3}>
+  <Card title="💥 Shoot" icon="gun">
+    Fire at opponent
+    
+    If bullet: opponent dies, you win
+    
+    If empty: chamber advances, turn passes
+  </Card>
+  
+  <Card title="🎲 Shoot Yourself" icon="dice">
+    Fire at yourself
+    
+    If bullet: you die, opponent wins
+    
+    If empty: gain bonus turn (cannot use consecutively)
+  </Card>
+  
+  <Card title="⏭️ Pass" icon="forward">
+    Skip turn
+    
+    Pass gun to opponent
+  </Card>
+</CardGroup>
+
+### Turn Timer
+
+- 30 seconds per turn
+- Auto-pass if time expires
+- Gun automatically passes to opponent
+
+### Statistics Tracking
+
+```typescript
+// From russian.ts:516-525
+await RussianStatsManager.recordGame(
+  winner.id,
+  winner.tag,
+  victim.id,
+  victim.tag,
+  turns,
+  currentSlot + 1,
+  cause,
+  interaction.guildId || undefined,
+);
+```
+
+Tracked data:
+- Winner and victim
+- Number of turns
+- Chamber number (1-6)
+- Cause of death ("shot" or "shot_self")
+- Guild ID for server-specific stats
+
+<Warning>
+  Only one Russian Roulette game can be active per server. Players cannot participate in multiple games simultaneously.
+</Warning>
+
+---
+
+## /oracle
+
+8-ball style fortune telling command.
+
+<ParamField path="question" type="String" required>
+  The question to ask (max 1024 characters)
+</ParamField>
+
+### Response Categories
+
+The oracle provides 20 possible responses:
+
+**Positive (9):**
+- "The divine winds favor thee."
+- "Alteruism shines upon thy path."
+- "The oracles decree: Yes."
+- "The answer is yes."
+- "Signs point to divine approval."
+- (and 4 more...)
+
+**Uncertain (5):**
+- "The mists of fate cloud the answer. Try again."
+- "The oracles are silent. Ask again later."
+- "Cannot predict now."
+- (and 2 more...)
+
+**Negative (6):**
+- "Do not count on it."
+- "The sacred decree is no."
+- "The spirits say nay."
+- "The omens are not favorable."
+- (and 2 more...)
+
+---
+
+## /furry
+
+Detect furry energy levels in users.
+
+<ParamField path="target" type="User">
+  User to check (random if not specified)
+</ParamField>
+
+### Detection System
+
+```typescript
+// From furry.ts:72-74
+const nameHash = hashString(displayName);
+const furryLevel = (nameHash % 100) + 1;
+const isFurry = furryLevel >= 50;
+```
+
+### Fursona Assignment
+
+If detected as furry (≥50%), assigns a fursona from categories:
+
+<Tabs>
+  <Tab title="Canine">
+    Wolf, Fox, Dog, Coyote, Jackal, Dingo
+  </Tab>
+  
+  <Tab title="Feline">
+    Cat, Tiger, Lion, Panther, Leopard, Cheetah, Cougar
+  </Tab>
+  
+  <Tab title="Mythical">
+    Dragon, Griffin, Kirin, Unicorn, Phoenix, Werewolf, Chimera
+  </Tab>
+  
+  <Tab title="Synthetic">
+    Protogen, Primagen, Android
+  </Tab>
+  
+  <Tab title="Aquatic">
+    Seal, Shark, Dolphin, Orca, Otter, Octopus
+  </Tab>
+  
+  <Tab title="Mammal">
+    Raccoon, Deer, Bear, Rabbit, Horse, Bat, Squirrel, and more
+  </Tab>
+  
+  <Tab title="Insect">
+    Bee, Moth, Butterfly, Ant
+  </Tab>
+  
+  <Tab title="Avian">
+    Raven, Parrot, Bird, Hawk, Owl, Eagle
+  </Tab>
+</Tabs>
+
+### Display Format
+
+Shows:
+- Furry Level percentage
+- Fursona (species and category) if applicable
+- Color-coded embed (pink for furry, gray for non-furry)
+
+<Note>
+  Results are deterministic based on display name. The same name will always produce the same furry level.
+</Note>

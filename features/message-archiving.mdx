@@ -1,0 +1,304 @@
+---
+title: 'Message Archiving'
+description: 'Automatically archive purged messages for moderation and recovery'
+icon: 'archive'
+---
+
+## Overview
+
+The Message Archiving system logs all messages deleted through bulk purge operations, creating a permanent record for moderation review, appeals, or recovery. This ensures accountability and provides a safety net for accidental deletions.
+
+## How It Works
+
+When messages are purged using moderation commands:
+
+1. The purge command collects messages to be deleted
+2. Before deletion, messages are logged to the archive
+3. Messages are stored with metadata (author, timestamp, content, attachments)
+4. A unique action ID links all messages from the same purge
+5. Messages are deleted from Discord
+6. Archive can be queried later for review
+
+<Info>
+  Only messages deleted through bulk purge commands are archived. Single message deletions by users are not logged.
+</Info>
+
+## Archived Data
+
+Each archived message includes (messageLogger.ts:5):
+
+- **Message ID**: Original Discord message ID
+- **Content**: Full text content (or `[NO TEXT CONTENT]` if empty)
+- **Author ID**: Discord user ID of message sender  
+- **Author Tag**: Username#discriminator at time of purge
+- **Channel ID**: Where the message was posted
+- **Channel Name**: Channel name at time of purge
+- **Guild ID**: Server ID
+- **Timestamp**: When the message was originally sent
+- **Attachments**: Array of attachment URLs
+- **Embeds**: Serialized embed data
+- **Purged By**: User ID who executed the purge
+- **Purged At**: Timestamp of purge action
+- **Purge Action ID**: Unique ID grouping messages from same purge
+
+## Storage Format
+
+Messages are stored in `data/purged_messages.json` as a JSON array:
+
+```json
+[
+  {
+    "id": "1234567890",
+    "content": "Example message content",
+    "authorId": "987654321",
+    "authorTag": "Username#1234",
+    "channelId": "1122334455",
+    "channelName": "general",
+    "guildId": "5566778899",
+    "timestamp": "2024-01-15T10:30:00.000Z",
+    "attachments": [
+      "https://cdn.discordapp.com/attachments/..."
+    ],
+    "embeds": [],
+    "purgedBy": "1928374650",
+    "purgedAt": "2024-01-15T11:00:00.000Z",
+    "purgeActionId": "550e8400-e29b-41d4-a716-446655440000"
+  }
+]
+```
+
+### Action ID Grouping
+
+The `purgeActionId` is a UUID generated for each purge operation. This allows you to:
+
+- Retrieve all messages from a specific purge event
+- Distinguish between different moderation actions
+- Track which moderator performed which purge
+
+<Note>
+  Attachment URLs point to Discord's CDN. These URLs may expire after a period of time, making old attachments inaccessible.
+</Note>
+
+## Usage in Purge Commands
+
+Integrate message archiving into purge/bulk delete commands:
+
+```typescript
+import { MessageLogger } from '../utils/messageLogger.js';
+import { randomUUID } from 'crypto';
+
+// Fetch messages to purge
+const messagesToDelete = await channel.messages.fetch({ limit: 100 });
+const actionId = randomUUID();
+
+// Archive before deletion
+await MessageLogger.logPurgedMessages(
+  Array.from(messagesToDelete.values()),
+  interaction.user.id,
+  actionId
+);
+
+// Delete messages
+await channel.bulkDelete(messagesToDelete);
+```
+
+## Retrieving Archived Messages
+
+### Get All Archives for a Server
+
+```typescript
+const messages = await MessageLogger.getPurgedMessages(guildId);
+```
+
+Returns all purged messages for the specified server.
+
+### Get All Archives (All Servers)
+
+```typescript
+const allMessages = await MessageLogger.getPurgedMessages();
+```
+
+Returns every archived message across all servers.
+
+### Get Specific Purge Action
+
+```typescript
+const messages = await MessageLogger.getPurgedMessagesByActionId(actionId);
+```
+
+Returns all messages from a single purge action.
+
+## Implementation Details
+
+### Key Files
+
+- `src/utils/messageLogger.ts` - Message archiving system (messageLogger.ts:1)
+- Purge commands - Integration points
+
+### Data Directory Management
+
+The system automatically creates the data directory if it doesn't exist (messageLogger.ts:28):
+
+```typescript
+private static async ensureDataDirectory(): Promise<void> {
+  const dataDir = path.dirname(this.PURGED_FILE);
+  try {
+    await fs.access(dataDir);
+  } catch {
+    await fs.mkdir(dataDir, { recursive: true });
+  }
+}
+```
+
+### Error Handling
+
+If the archive file is missing or corrupted:
+- Reading returns an empty array
+- System continues to function
+- New purges create a fresh archive file
+
+<Warning>
+  The archive file can grow large over time. Consider implementing rotation or cleanup policies for old data.
+</Warning>
+
+## Creating an Archives Command
+
+You can create a command to view archived messages:
+
+```typescript
+// /archives command example
+export async function execute(interaction: ChatInputCommandInteraction) {
+  const actionId = interaction.options.getString('action_id');
+  
+  if (actionId) {
+    const messages = await MessageLogger.getPurgedMessagesByActionId(actionId);
+    // Display messages in embed
+  } else {
+    const recentMessages = await MessageLogger.getPurgedMessages(interaction.guildId!);
+    // Show recent purge actions
+  }
+}
+```
+
+## Privacy Considerations
+
+### Data Retention
+
+Archived messages are stored indefinitely by default. Consider:
+
+1. **Retention Policy**: Delete archives older than X days/months
+2. **User Requests**: Provide a way for users to request their data
+3. **Secure Storage**: Ensure the data directory has appropriate file permissions
+
+### Access Control
+
+Only trusted moderators should access the archives command:
+
+```typescript
+.setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+```
+
+### GDPR Compliance
+
+If operating in EU/UK:
+- Inform users that deleted messages may be archived
+- Provide data access requests
+- Implement data deletion on request
+- Include in privacy policy
+
+<Info>
+  Check your local laws regarding message retention and user data privacy.
+</Info>
+
+## Advanced Features
+
+### Archive Search
+
+Implement search functionality:
+
+```typescript
+async function searchArchives(guildId: string, query: string) {
+  const messages = await MessageLogger.getPurgedMessages(guildId);
+  return messages.filter(msg => 
+    msg.content.toLowerCase().includes(query.toLowerCase())
+  );
+}
+```
+
+### Export to File
+
+Create downloadable archive exports:
+
+```typescript
+import { AttachmentBuilder } from 'discord.js';
+
+const messages = await MessageLogger.getPurgedMessagesByActionId(actionId);
+const json = JSON.stringify(messages, null, 2);
+const attachment = new AttachmentBuilder(Buffer.from(json), {
+  name: `archive-${actionId}.json`
+});
+
+await interaction.reply({ files: [attachment] });
+```
+
+### Archive Statistics
+
+Generate purge statistics:
+
+```typescript
+const messages = await MessageLogger.getPurgedMessages(guildId);
+const stats = {
+  totalPurged: messages.length,
+  byModerator: {},
+  byChannel: {},
+  byDate: {}
+};
+
+messages.forEach(msg => {
+  stats.byModerator[msg.purgedBy] = (stats.byModerator[msg.purgedBy] || 0) + 1;
+  // ...
+});
+```
+
+## Best Practices
+
+1. **Regular backups**: Back up the `purged_messages.json` file regularly
+2. **Size monitoring**: Watch file size and implement rotation when needed
+3. **Access logging**: Log when moderators access archives
+4. **Retention policy**: Document how long archives are kept
+5. **Attachment backup**: Consider downloading attachments before URLs expire
+6. **Audit trail**: Keep records of archive access and modifications
+
+## Troubleshooting
+
+### Archive file growing too large
+
+Implement file rotation:
+
+```typescript
+// Archive messages older than 90 days to separate file
+const cutoffDate = new Date();
+cutoffDate.setDate(cutoffDate.getDate() - 90);
+
+const messages = await readPurgedMessages();
+const active = messages.filter(m => new Date(m.purgedAt) > cutoffDate);
+const archived = messages.filter(m => new Date(m.purgedAt) <= cutoffDate);
+
+await writePurgedMessages(active);
+await writeFile('data/purged_messages_archive.json', JSON.stringify(archived));
+```
+
+### Messages not being archived
+
+1. Check the purge command calls `MessageLogger.logPurgedMessages()` before deletion
+2. Verify the data directory is writable
+3. Check bot logs for file write errors
+4. Ensure messages are being passed correctly (not null/undefined)
+
+### Cannot retrieve messages by action ID
+
+Verify:
+- Action ID was generated and stored correctly
+- Action ID is a valid UUID
+- Messages were successfully written to the file
+- No JSON corruption in the archive file

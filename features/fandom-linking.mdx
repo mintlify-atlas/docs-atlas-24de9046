@@ -1,0 +1,185 @@
+---
+title: 'Fandom Linking'
+description: 'Link Discord accounts with Fandom wikis and sync roles automatically'
+icon: 'link'
+---
+
+## Overview
+
+The Fandom Linking feature allows Discord users to link their Discord accounts with their Fandom wiki accounts. Once linked, Aphonos automatically synchronizes Discord roles based on Fandom user groups, edit counts, and top contributor status.
+
+## How It Works
+
+### Verification Flow
+
+The linking process uses Fandom's API and profile system to verify account ownership:
+
+<Steps>
+  <Step title="User initiates link">
+    Run `/link fandomusername:YourUsername` (case-sensitive)
+  </Step>
+  
+  <Step title="Fandom account lookup">
+    Aphonos queries the MediaWiki API to verify the account exists:
+    ```
+    https://alter-ego.fandom.com/api.php?action=query&list=users&ususers={username}
+    ```
+    This returns the user's ID, groups, edit count, and registration date.
+  </Step>
+  
+  <Step title="Discord handle verification">
+    Aphonos fetches the user's Fandom profile data:
+    ```
+    https://alter-ego.fandom.com/wikia.php?controller=UserProfile&method=getUserData&userId={id}
+    ```
+    The bot compares the Discord handle set in the Fandom profile with the Discord username.
+  </Step>
+  
+  <Step title="Set Discord handle (if needed)">
+    If Discord handle is missing or mismatched, users are directed to:
+    ```
+    Special:VerifyUser/{username}?user={discordUsername}
+    ```
+    This special page helps users add/update their Discord handle on Fandom.
+  </Step>
+  
+  <Step title="Confirmation">
+    After verification, users must click a confirmation button within 60 seconds to complete the link.
+  </Step>
+  
+  <Step title="Role synchronization">
+    Upon confirmation, Aphonos grants appropriate roles based on Fandom groups, edit count, and top contributor status.
+  </Step>
+</Steps>
+
+<Warning>
+  Account links are **permanent** and can only be undone by administrators. Each Discord account can only be linked to one Fandom account, and vice versa.
+</Warning>
+
+## Role Synchronization
+
+### Fandom Group Roles
+
+Aphonos maps Fandom user groups to Discord roles:
+
+- **Wiki Staff** roles based on Fandom permissions (sysop, content-moderator, etc.)
+- **Linked** role for all verified users
+- **Staff** role for users with any Fandom administrative group
+
+The mapping is defined in `src/utils/roleConstants.ts` using the `FANDOM_ROLE_MAP`.
+
+### Edit Count Roles
+
+Edit count roles are granted based on mainspace (namespace 0) contributions:
+
+- **250+ Edits**: Granted after 250 mainspace edits
+- **1000+ Edits**: Granted after 1000 mainspace edits
+
+Edit counts are fetched using the MediaWiki API:
+```
+https://alter-ego.fandom.com/api.php?action=query&list=usercontribs&ucuser={username}&ucnamespace=0
+```
+
+The bot uses pagination with limits of 499 and 249 to efficiently determine edit count thresholds without fetching all contributions.
+
+### Top Contributor Role
+
+Aphonos integrates with the **AEWiki-Recap** GitHub repository to track weekly top contributors:
+
+- Data is fetched from: `https://raw.githubusercontent.com/Paradoxum-Wikis/AEWiki-Recap/main/data/{year}/recap-{date}.json`
+- Users in the **top 5** for the current week receive the "Top Contributor" role
+- Roles are automatically updated when users sync their accounts
+
+<Info>
+  The top contributor system checks the most recent recap file in the current year's directory to determine rankings.
+</Info>
+
+## Commands
+
+### `/link`
+
+Links your Discord account to a Fandom account.
+
+**Parameters:**
+- `fandomusername` (required): Your exact Fandom username (case-sensitive)
+
+**Example:**
+```
+/link fandomusername:JohnDoe
+```
+
+### `/checklink`
+
+Check your current link status and manually sync roles from Fandom.
+
+### `/syncroles`
+
+Manually trigger a role synchronization for your linked account. This updates:
+- Fandom group roles
+- Edit count roles  
+- Top contributor status
+
+## Data Storage
+
+Linked accounts are stored in `data/linked_accounts.json` with the following structure:
+
+```json
+{
+  "discordUserId": "123456789",
+  "discordTag": "user#1234",
+  "fandomUsername": "WikiUser",
+  "fandomUserId": 987654,
+  "linkedAt": "2024-01-15T10:30:00.000Z"
+}
+```
+
+## Implementation Details
+
+### Key Files
+
+- `src/commands/link.ts` - Link command implementation (link.ts:1)
+- `src/utils/fandomRoleManager.ts` - Role synchronization logic (fandomRoleManager.ts:1)
+- `src/utils/topContributors.ts` - Top contributor management (topContributors.ts:1)
+- `src/utils/linkLogger.ts` - Link data persistence (linkLogger.ts:1)
+
+### API Endpoints Used
+
+1. **MediaWiki User Query API**
+   - Endpoint: `https://alter-ego.fandom.com/api.php`
+   - Action: `query`, List: `users`
+   - Props: `groups`, `gender`, `registration`, `editcount`
+
+2. **Fandom User Profile API**
+   - Endpoint: `https://alter-ego.fandom.com/wikia.php`
+   - Controller: `UserProfile`
+   - Method: `getUserData`
+
+3. **User Contributions API**
+   - Endpoint: `https://alter-ego.fandom.com/api.php`
+   - Action: `query`, List: `usercontribs`
+   - Namespace: `0` (mainspace only)
+
+4. **GitHub Recap Data**
+   - Endpoint: `https://api.github.com/repos/Paradoxum-Wikis/AEWiki-Recap/contents/data/{year}`
+   - Raw data: `https://raw.githubusercontent.com/Paradoxum-Wikis/AEWiki-Recap/main/data/{year}/{file}`
+
+<Note>
+  Role synchronization automatically removes outdated roles when Fandom permissions change, ensuring Discord roles always reflect current wiki status.
+</Note>
+
+## Troubleshooting
+
+### "Discord handle not found on Fandom profile"
+
+1. Visit the Special:VerifyUser link provided by the bot
+2. Set your Discord username in your Fandom profile
+3. Wait a few minutes for Fandom to update
+4. Run `/link` again
+
+### "Discord handle mismatch"
+
+The Discord username on Fandom doesn't match your current Discord username. Update it using the Special:VerifyUser page.
+
+### "Account already linked"
+
+Each Discord and Fandom account can only be linked once. Contact an administrator if you need to change your link.

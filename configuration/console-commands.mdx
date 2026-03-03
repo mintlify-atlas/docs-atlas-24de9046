@@ -1,0 +1,268 @@
+---
+title: Console Commands
+description: Interactive console commands for managing and monitoring the Aphonos bot
+---
+
+## Overview
+
+Aphonos includes an interactive console interface for real-time bot management. Commands are available immediately after the bot starts and displays:
+
+```
+Console command handler ready. Type "help" for options.
+
+altershaper>
+```
+
+All console commands are registered in `src/utils/consoleCommands.ts` and handled by `src/utils/consoleHandler.ts`.
+
+## Available Commands
+
+### help (h)
+
+List all available console commands.
+
+```bash
+altershaper> help
+```
+
+**Output:**
+```
+Available console commands:
+  • help — List available console commands (alias: h)
+  • status — Print current bot status (alias: s)
+  • reload — Reload registered slash commands (alias: r)
+  • restart — Restart the bot internals (alias: re)
+  • shutdown — Gracefully stop the bot (aliases: exit, sd)
+  • clearcache — Clear Discord.js caches (alias: cc)
+  • guilds — List all connected servers (alias: g)
+  • locks — View active battle locks (alias: l)
+```
+
+**Alias:** `h`
+
+---
+
+### status (s)
+
+Display current bot status including uptime, connected guilds, cached users, and websocket ping.
+
+```bash
+altershaper> status
+```
+
+**Output:**
+```
+Altershaper Status:
+  • Ready at: <t:1709467234:R>
+  • Guilds: 2
+  • Users cached: 456
+  • Ping: 87ms
+```
+
+**Alias:** `s`
+
+---
+
+### reload (r)
+
+Reload all registered slash commands without restarting the bot. Useful after modifying command files.
+
+```bash
+altershaper> reload
+```
+
+**Output:**
+```
+Reloading slash commands...
+Registering divine slash commands...
+Divine slash commands registered successfully!
+Slash commands reloaded successfully!
+```
+
+<Warning>
+  This command reloads slash commands globally across all Discord servers. Changes may take up to 1 hour to propagate.
+</Warning>
+
+**Alias:** `r`
+
+---
+
+### restart (re)
+
+Restart the bot's internal client without terminating the process. This destroys the current Discord client, reloads commands, and creates a new client connection.
+
+```bash
+altershaper> restart
+```
+
+**Output:**
+```
+Restarting Altershaper bot internals...
+Altershaper bot hath awakened as BotName#1234
+Altershaper bot internals restarted successfully!
+```
+
+<Warning>
+  If the restart fails, the bot will automatically shut down with exit code 1. Manual intervention required.
+</Warning>
+
+**Alias:** `re`
+
+---
+
+### shutdown (exit, sd)
+
+Gracefully shut down the bot and terminate the process.
+
+```bash
+altershaper> shutdown
+```
+
+**Output:**
+```
+Shutting down Altershaper bot...
+```
+
+The process exits with code 0.
+
+**Aliases:** `exit`, `sd`
+
+---
+
+### clearcache (cc)
+
+Clear Discord.js internal caches for users, channels, and guild members. Useful for freeing memory in long-running instances.
+
+```bash
+altershaper> clearcache
+```
+
+**Output:**
+```
+Clearing Discord.js caches...
+Cleared 1234 users and 567 channels from cache
+```
+
+**Alias:** `cc`
+
+---
+
+### guilds (g)
+
+List all Discord servers (guilds) the bot is connected to with detailed information.
+
+```bash
+altershaper> guilds
+```
+
+**Output:**
+```
+Connected Guilds:
+================================
+ALTER EGO Wiki
+   • ID: 1366507366681673920
+   • Members: 1234
+   • Owner: 123456789012345678
+   • Channels: 42
+
+Tower Defense Simulator Wiki
+   • ID: 827531372120768513
+   • Members: 5678
+   • Owner: 987654321098765432
+   • Channels: 38
+
+Total: 2 guild(s)
+================================
+```
+
+**Alias:** `g`
+
+---
+
+### locks (l)
+
+View all active battle locks. Battle locks prevent users from starting multiple battles simultaneously.
+
+```bash
+altershaper> locks
+```
+
+**Output when locks exist:**
+```
+Active Battle Locks:
+================================
+ALTER EGO Wiki
+   • Guild ID: 1366507366681673920
+   • Locked Users: 2
+   • Users: User1#1234, User2#5678
+
+Total: 1 guild lock(s)
+================================
+```
+
+**Output when no locks:**
+```
+Active Battle Locks:
+================================
+No active battle locks
+
+================================
+```
+
+**Alias:** `l`
+
+## Console Handler Implementation
+
+The console handler uses Node.js readline for interactive input:
+
+- **Prompt:** `altershaper>`
+- **Error Handling:** Commands that throw errors display `❌ Console command failed:` followed by the error
+- **Unknown Commands:** Typing an invalid command shows `Unknown command "xyz". Type "help" to list all options.`
+- **Case Insensitive:** All commands are case-insensitive
+
+## Graceful Shutdown Signals
+
+In addition to the `shutdown` command, the bot handles system signals:
+
+```typescript
+process.on('SIGINT', () => {
+  console.log('Shutting down gracefully...');
+  client.destroy();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('Shutting down gracefully...');
+  client.destroy();
+  process.exit(0);
+});
+```
+
+You can press **Ctrl+C** to trigger SIGINT and gracefully shut down the bot.
+
+## Adding Custom Console Commands
+
+To add your own console commands, edit `src/utils/consoleCommands.ts`:
+
+```typescript
+handler.registerCommand(
+  'mycommand',
+  'Description of what my command does',
+  () => {
+    console.log('My custom command executed!');
+  }
+);
+```
+
+For commands with aliases:
+
+```typescript
+handler.registerCommand(
+  'mc',
+  'Alias for mycommand',
+  () => {
+    console.log('My custom command executed!');
+  },
+  true  // Mark as alias (hidden from help list)
+);
+```

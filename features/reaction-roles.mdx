@@ -1,0 +1,219 @@
+---
+title: 'Reaction Roles'
+description: 'Automatically assign roles when users react to messages'
+icon: 'hand-pointer'
+---
+
+## Overview
+
+The Reaction Role system allows administrators to set up messages where users can self-assign roles by adding reactions. This is perfect for role selection menus, opt-in channels, and community organization.
+
+## How It Works
+
+Reaction roles are configured using rules that map specific reactions on specific messages to Discord roles:
+
+1. Admin creates a reaction role rule using `/reactionrole add`
+2. When a user reacts to the configured message, they receive the role
+3. When a user removes their reaction, the role is removed (optional)
+
+### Message Cache Warming
+
+On bot startup, Aphonos fetches all configured reaction role messages to ensure they're cached. This prevents issues with partial message objects and ensures reliable role assignment:
+
+```typescript
+// From reactionRoleHandler.ts:24
+public static async initialize(client: Client): Promise<void> {
+  // Fetches each configured message to warm the cache
+}
+```
+
+## Configuration
+
+### Adding a Reaction Role
+
+Use the `/reactionrole add` command to create a new reaction role rule.
+
+**Parameters:**
+- `message_id` (required): The Discord message ID to watch
+- `emoji` (required): The emoji users will react with
+  - Unicode emoji: Use the emoji directly (e.g., `🖋️`)
+  - Custom emoji: Use the emoji mention format (e.g., `<:name:123456>`)
+- `role_id` (required): The role ID to assign
+- `channel_id` (optional): Channel containing the message (defaults to current channel)
+- `remove_on_unreact` (optional): Whether to remove the role when reaction is removed (default: `true`)
+
+**Example:**
+```
+/reactionrole add message_id:1234567890 emoji:🖋️ role_id:9876543210
+```
+
+<Info>
+  The bot validates that the message exists and is accessible before creating the rule. Make sure the bot has "View Channel" and "Read Message History" permissions.
+</Info>
+
+### Removing a Reaction Role
+
+Use `/reactionrole remove` to delete a reaction role rule.
+
+**Parameters:**
+- `message_id` (required): The message ID
+- `emoji` (required): The emoji (must match format used when adding)
+- `channel_id` (optional): Channel containing the message (defaults to current channel)
+
+**Example:**
+```
+/reactionrole remove message_id:1234567890 emoji:🖋️
+```
+
+### Listing Reaction Roles
+
+View all reaction role rules for the server:
+
+```
+/reactionrole list
+```
+
+This shows:
+- Channel ID
+- Message ID  
+- Emoji identifier
+- Role ID
+- Whether the role is removed on unreact
+
+## Emoji Handling
+
+### Unicode Emoji
+
+For standard Unicode emoji like 🖋️, 👍, or ❤️, simply paste the emoji directly:
+```
+emoji:🖋️
+```
+
+### Custom Emoji
+
+For custom server emoji, use the emoji mention format:
+```
+emoji:<:name:123456789>
+```
+
+Aphonos automatically extracts the numeric emoji ID (`123456789`) for storage. When matching reactions, it compares:
+```typescript
+const emojiNameOrId = reaction.emoji.id ?? reaction.emoji.name ?? null;
+```
+
+<Note>
+  Animated custom emoji use `<a:name:id>` format. The bot handles both static and animated emoji.
+</Note>
+
+## Data Storage
+
+Reaction role rules are stored in `data/reaction_roles.json`:
+
+```json
+{
+  "reactionRoleRules": [
+    {
+      "guildId": "123456789",
+      "channelId": "987654321",
+      "messageId": "1122334455",
+      "emoji": "🖋️",
+      "roleId": "5566778899",
+      "removeOnUnreact": true
+    }
+  ]
+}
+```
+
+### Data Validation
+
+The store includes validation to ensure data integrity (reactionRoleStore.ts:66):
+
+- Guild, channel, message, and role IDs must be valid Discord snowflakes (15-25 digit numbers)
+- Emoji must be a non-empty string
+- `removeOnUnreact` must be a boolean (defaults to `true`)
+
+## Event Handling
+
+### Reaction Add
+
+When a user adds a reaction (eventHandlers.ts:130):
+
+1. Fetch partial reactions and users if needed
+2. Ignore reactions from bots
+3. Find matching reaction role rules
+4. Grant the configured role(s) to the user
+
+### Reaction Remove
+
+When a user removes a reaction (eventHandlers.ts:158):
+
+1. Fetch partial reactions and users if needed
+2. Ignore reactions from bots
+3. Find matching reaction role rules
+4. If `removeOnUnreact` is `true`, remove the role(s)
+
+<Warning>
+  If `removeOnUnreact` is set to `false`, roles are only added, never removed. This is useful for permanent role assignments.
+</Warning>
+
+## Implementation Details
+
+### Key Files
+
+- `src/commands/reactionrole.ts` - Command implementation (reactionrole.ts:1)
+- `src/utils/reactionRoleHandler.ts` - Event handling logic (reactionRoleHandler.ts:1)
+- `src/utils/reactionRoleStore.ts` - Data persistence and validation (reactionRoleStore.ts:1)
+- `src/utils/eventHandlers.ts` - Reaction event integration (eventHandlers.ts:130)
+
+### Rule Matching
+
+Rules are matched using a unique key (reactionRoleStore.ts:265):
+
+```typescript
+function reactionRoleRuleKey(r): string {
+  return `${r.guildId}:${r.channelId}:${r.messageId}:${r.emoji}`;
+}
+```
+
+This ensures each guild+channel+message+emoji combination can only have one rule.
+
+## Permissions
+
+The `/reactionrole` command requires the **Manage Server** permission (`PermissionFlagsBits.ManageGuild`).
+
+The bot needs these permissions to function:
+- **View Channel**: To see the configured channels
+- **Read Message History**: To fetch and cache messages
+- **Manage Roles**: To assign and remove roles
+- **Add Reactions**: Optional, but recommended to add the initial reaction
+
+<Info>
+  The bot can only assign roles that are lower in the role hierarchy than its own highest role.
+</Info>
+
+## Best Practices
+
+1. **Create a dedicated message**: Use a clear, formatted message explaining what each reaction does
+2. **Add initial reactions**: React to the message yourself so users know which emoji to use
+3. **Test first**: Create a test rule in a private channel before deploying to public channels
+4. **Use removeOnUnreact wisely**: Set to `false` for permanent assignments, `true` for toggleable roles
+5. **Organize rules**: Use `/reactionrole list` to keep track of all configured rules
+
+## Troubleshooting
+
+### Reactions not working
+
+- Verify the bot has **Manage Roles** permission
+- Ensure the bot's role is higher than the roles being assigned
+- Check that message_id and channel_id are correct
+- Confirm the emoji matches exactly (including custom emoji ID)
+
+### "Failed to fetch message"
+
+- Make sure the bot has **Read Message History** permission
+- Verify the message exists and hasn't been deleted
+- Check that the channel_id is correct if specified
+
+### Role not being removed on unreact
+
+Check if `removeOnUnreact` is set to `true` in the rule. Use `/reactionrole list` to verify the setting.

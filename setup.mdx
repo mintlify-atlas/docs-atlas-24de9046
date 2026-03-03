@@ -1,0 +1,192 @@
+---
+title: Setup
+description: Install and configure Aphonos in your Discord server
+---
+
+# Setup
+
+Get Aphonos up and running in your Discord server with this step-by-step guide.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+- **Node.js** (v16 or higher recommended)
+- **npm** (comes with Node.js)
+- A **Discord bot token** from the [Discord Developer Portal](https://discord.com/developers/applications)
+
+## Installation
+
+<Steps>
+  <Step title="Clone or download the repository">
+    Get the Aphonos source code on your local machine or server.
+  </Step>
+
+  <Step title="Install dependencies">
+    Navigate to the project directory and install the required packages:
+
+    ```bash
+    npm install
+    ```
+
+    This will install:
+    - `discord.js` (v14.25.1+) - Discord API wrapper
+    - `canvas` - For image generation in fun commands
+    - `dotenv` - Environment variable management
+    - TypeScript and related dev dependencies
+  </Step>
+
+  <Step title="Configure environment variables">
+    Create a `.env` file in the root directory with your Discord bot token:
+
+    ```bash .env
+    DISCORD_TOKEN=your_discord_bot_token_here
+    ```
+
+    <Warning>
+      Never commit your `.env` file to version control. Keep your bot token secret!
+    </Warning>
+  </Step>
+
+  <Step title="Build the project">
+    Compile the TypeScript code to JavaScript:
+
+    ```bash
+    npm run build
+    ```
+
+    This command compiles the TypeScript files and copies necessary assets (images for commands) to the `dist/` directory.
+  </Step>
+
+  <Step title="Start the bot">
+    Launch Aphonos with:
+
+    ```bash
+    npm start
+    ```
+
+    You should see a message confirming the bot is online:
+    ```
+    Altershaper bot hath awakened as YourBotName#1234
+    ```
+  </Step>
+</Steps>
+
+## Development mode
+
+For development with hot-reloading, use:
+
+```bash
+npm run dev
+```
+
+This skips the compilation step and runs the TypeScript code directly using `tsx`, making development faster.
+
+## Discord Developer Portal setup
+
+<Steps>
+  <Step title="Create a new application">
+    1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
+    2. Click "New Application"
+    3. Give your bot a name (e.g., "Aphonos")
+  </Step>
+
+  <Step title="Create a bot user">
+    1. Navigate to the "Bot" tab
+    2. Click "Add Bot"
+    3. Copy your bot token (you'll need this for the `.env` file)
+  </Step>
+
+  <Step title="Configure bot settings">
+    Enable the following Privileged Gateway Intents:
+    - **Server Members Intent** - Required for member join events and member management
+    - **Message Content Intent** - Required for reading message content
+  </Step>
+
+  <Step title="Generate invite link">
+    1. Go to the "OAuth2" → "URL Generator" tab
+    2. Select scopes:
+       - `bot`
+       - `applications.commands`
+    3. Select permissions (see [permissions page](/permissions) for details)
+    4. Copy the generated URL and use it to invite the bot to your server
+  </Step>
+</Steps>
+
+## Verifying the installation
+
+Once the bot is running, you can verify it's working correctly:
+
+<CodeGroup>
+```bash Check bot status
+# The bot will log visible channels and permissions on startup
+# Look for output like:
+Permissions:
+================================
+Server: Your Server Name (ID: ...)
+  Text: #general (ID: ...) - CAN READ
+================================
+```
+
+```bash Test slash commands
+# In Discord, type / and you should see Aphonos commands
+# Try a simple command like:
+/help
+```
+</CodeGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Bot is not responding to commands">
+    - Ensure the bot is online and shows as active in your server
+    - Check that you've enabled the required Privileged Gateway Intents
+    - Verify the bot has the necessary permissions in your server
+    - Check the console for any error messages
+  </Accordion>
+
+  <Accordion title="DISCORD_TOKEN not found error">
+    - Make sure you've created a `.env` file in the root directory
+    - Verify the file is named exactly `.env` (not `.env.txt`)
+    - Confirm the token is on a line that starts with `DISCORD_TOKEN=`
+    - Ensure there are no extra spaces or quotes around the token
+  </Accordion>
+
+  <Accordion title="Permission errors when using commands">
+    - Review the [permissions page](/permissions) for required permissions
+    - Ensure the bot's role is positioned high enough in the role hierarchy
+    - Check channel-specific permission overrides
+  </Accordion>
+
+  <Accordion title="Build errors">
+    - Make sure you have Node.js v16 or higher installed
+    - Try deleting `node_modules` and `package-lock.json`, then run `npm install` again
+    - Check that all dependencies are properly installed
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+Now that Aphonos is running:
+
+1. Configure the [required permissions](/permissions)
+2. Explore available [commands](/commands/overview)
+3. Set up [wiki integration](/commands/wiki-integration) if needed
+4. Customize bot behavior for your server
+
+## Package information
+
+Aphonos uses the following key dependencies:
+
+```json package.json
+{
+  "name": "altershaper-bot",
+  "version": "1.0.0",
+  "description": "A Discord moderation bot for ALTER EGO Wiki server",
+  "dependencies": {
+    "canvas": "^3.2.0",
+    "discord.js": "^14.25.1",
+    "dotenv": "^17.2.3"
+  }
+}
+```

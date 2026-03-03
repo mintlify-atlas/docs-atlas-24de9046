@@ -1,0 +1,267 @@
+---
+title: 'Moderation Commands'
+description: 'Powerful moderation tools for server management including ban, kick, timeout, and warn'
+icon: 'gavel'
+---
+
+Moderation commands provide comprehensive tools for maintaining order in your Discord server. All actions are logged with unique Action IDs and can be managed through the moderation system.
+
+## /ban
+
+Permanently ban a user from the server.
+
+<ParamField path="user" type="User" required>
+  The user to ban from the server
+</ParamField>
+
+<ParamField path="reason" type="String">
+  Reason for the ban (defaults to "Heretical defiance of Alteruism")
+</ParamField>
+
+### Behavior
+
+- Sends a DM to the banned user with ban details
+- Creates a moderation log entry with Action ID (B#)
+- Displays an embed with executor, Action ID, and reason
+- Special easter egg for specific user IDs
+
+### Example Usage
+
+```typescript
+// From ban.ts:70
+await interaction.guild.members.ban(targetUser, { reason });
+
+const entryId = await ModerationLogger.addEntry({
+  type: "ban",
+  userId: targetUser.id,
+  userTag: targetUser.tag,
+  moderatorId: executor.id,
+  moderatorTag: executor.user.tag,
+  reason: reason,
+  guildId: interaction.guild.id,
+});
+```
+
+<Warning>
+  Ban actions are permanent and require administrator permissions. The target will be completely removed from the server and prevented from rejoining.
+</Warning>
+
+---
+
+## /kick
+
+Remove a user from the server (they can rejoin with a new invite).
+
+<ParamField path="user" type="User" required>
+  The user to kick from the server
+</ParamField>
+
+<ParamField path="reason" type="String">
+  Reason for the kick (defaults to "Defiance of sacred Alteruism")
+</ParamField>
+
+### Behavior
+
+- Sends a DM to the kicked user before removal
+- Creates a moderation log entry with Action ID (K#)
+- User can rejoin with a new invite link
+- Displays confirmation embed with Action ID
+
+### Example Usage
+
+```typescript
+// From kick.ts:60
+await targetMember.kick(reason);
+
+const entryId = await ModerationLogger.addEntry({
+  type: "kick",
+  userId: targetUser.id,
+  userTag: targetUser.tag,
+  moderatorId: executor.id,
+  moderatorTag: executor.user.tag,
+  reason: reason,
+  guildId: interaction.guild.id,
+});
+```
+
+---
+
+## /timeout
+
+Temporarily mute a user for a specified duration.
+
+<ParamField path="user" type="User" required>
+  The user to timeout
+</ParamField>
+
+<ParamField path="days" type="Integer">
+  Number of days (0-28)
+</ParamField>
+
+<ParamField path="hours" type="Integer">
+  Number of hours (0-23)
+</ParamField>
+
+<ParamField path="minutes" type="Integer">
+  Number of minutes (0-59)
+</ParamField>
+
+<ParamField path="reason" type="String">
+  Reason for the timeout (defaults to "Violation of sacred Alteruism")
+</ParamField>
+
+### Duration Rules
+
+- At least 1 minute required
+- Maximum: 40,320 minutes (28 days)
+- Accepts any combination of days, hours, and minutes
+
+### Behavior
+
+```typescript
+// From timeout.ts:59
+const totalMinutes = days * 24 * 60 + hours * 60 + minutes;
+
+// Convert to milliseconds for Discord API
+await targetMember.timeout(totalMinutes * 60 * 1000, reason);
+```
+
+### Example Usage
+
+<CodeGroup>
+
+```bash 1 hour timeout
+/timeout user:@User hours:1 reason:Spamming
+```
+
+```bash 2 days timeout
+/timeout user:@User days:2 reason:Repeated violations
+```
+
+```bash Complex duration
+/timeout user:@User days:1 hours:12 minutes:30
+```
+
+</CodeGroup>
+
+<Note>
+  The timeout embed displays both human-readable duration ("1 day, 12 hours, 30 minutes") and total minutes for clarity.
+</Note>
+
+---
+
+## /warn
+
+Issue a formal warning to a user.
+
+<ParamField path="user" type="User" required>
+  The user to warn
+</ParamField>
+
+<ParamField path="reason" type="String">
+  Reason for the warning (defaults to "Straying from the path of Alteruism")
+</ParamField>
+
+### Behavior
+
+- Creates a warning log entry with Action ID (W#)
+- Retrieves and displays total warning count for user
+- Sends DM to warned user with details
+- Tracks warning history per guild
+
+### Warning Tracking
+
+```typescript
+// From warn.ts:54-58
+const userWarns = await ModerationLogger.getUserWarns(
+  targetUser.id,
+  interaction.guild.id,
+);
+const warnCount = userWarns.length;
+```
+
+The warning count is displayed in the embed and included in the DM sent to the user.
+
+### Example Response
+
+```
+DIVINE WARNING ISSUED
+
+@User hath received a warning from the holy shaper!
+
+Messenger of Judgement: ModeratorName
+Warning ID: W123
+Total Warnings: 3
+Reason: Inappropriate language
+```
+
+<Warning>
+  While warnings don't directly restrict users, they create a permanent record that moderators can review. Multiple warnings may lead to more severe actions.
+</Warning>
+
+---
+
+## /removesin
+
+Revoke a moderation action and undo punishment where possible.
+
+<ParamField path="entryid" type="String" required>
+  The Action ID to revoke (W1, K1, B1, T1, C1, etc.)
+</ParamField>
+
+### Supported Action Types
+
+<AccordionGroup>
+  <Accordion title="Timeout (T#)">
+    Removes active timeout if user is still muted. If timeout already expired, records removal but no action taken.
+  </Accordion>
+  
+  <Accordion title="Ban (B#)">
+    Unbans the user if they are currently banned, allowing them to rejoin with an invite.
+  </Accordion>
+  
+  <Accordion title="Kick (K#)">
+    Records removal but cannot undo (user must be manually reinvited).
+  </Accordion>
+  
+  <Accordion title="Warn (W#)">
+    Removes warning from user's record.
+  </Accordion>
+  
+  <Accordion title="Clear (C#)">
+    Records removal but cannot restore deleted messages.
+  </Accordion>
+</AccordionGroup>
+
+### Example Implementation
+
+```typescript
+// From removesin.ts:53-66
+switch (entry.type) {
+  case "timeout":
+    const timeoutMember = await interaction.guild.members.fetch(entry.userId);
+    if (timeoutMember.isCommunicationDisabled()) {
+      await timeoutMember.timeout(
+        null,
+        `Timeout removed by ${executor.user.tag} (Mercy granted for ${entryId})`
+      );
+      undoResult = "Timeout lifted";
+    } else {
+      undoResult = "Timeout already expired";
+    }
+    break;
+  // ... other cases
+}
+```
+
+### Response Format
+
+The command displays:
+- Original transgression type and target
+- Executor of the removal
+- Punishment status (lifted, expired, cannot undo, etc.)
+- Sends DM to affected user notifying them of absolution
+
+<Note>
+  Action IDs are case-insensitive. You can use "w1", "W1", "k5", or "K5" interchangeably.
+</Note>

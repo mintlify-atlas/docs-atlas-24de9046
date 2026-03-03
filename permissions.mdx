@@ -1,0 +1,283 @@
+---
+title: Permissions
+description: Configure the required Discord permissions for Aphonos to function properly
+---
+
+# Permissions
+
+Aphonos requires specific Discord permissions to perform moderation, management, and utility functions. You can configure these permissions either through server role settings or in the Discord Developer Portal.
+
+## Permission configuration methods
+
+There are two ways to grant Aphonos the permissions it needs:
+
+<CardGroup cols={2}>
+  <Card title="Role permissions" icon="users">
+    Configure permissions through the bot's role in your server settings
+  </Card>
+  <Card title="Bot permissions" icon="robot">
+    Set permissions in the Discord Developer Portal before inviting
+  </Card>
+</CardGroup>
+
+## Required permissions
+
+Here are the permissions Aphonos needs to function properly:
+
+| Role Permissions (In-server) | Bot Permissions (Dev Portal) | Required For |
+| --- | --- | --- |
+| Kick, Approve and Reject Members | Kick Members | `/kick` command |
+| Ban Members | Ban Members | `/ban` command |
+| Time out members | Moderate Members | `/timeout` command |
+| Manage Messages | Manage Messages | `/clear`, `/archives` commands |
+| Send Messages | Send Messages | Sending responses and embeds |
+| Embed Links | Embed Links | Rich embed responses |
+| Read Message History | Read Message History | Message archiving, context |
+| Add Reactions | Add Reactions | Reaction roles, interactive features |
+| View Channels | View Channels | Accessing channels for commands |
+
+<Note>
+  These are the core permissions. Some features may require additional permissions. For self-hosted instances, consider enabling all permissions for full functionality.
+</Note>
+
+## Setting up permissions
+
+### Method 1: Role permissions (recommended)
+
+<Steps>
+  <Step title="Navigate to server settings">
+    Open your Discord server and go to **Server Settings** → **Roles**
+  </Step>
+
+  <Step title="Find the bot's role">
+    Locate the role that was automatically created when you invited Aphonos (it usually has the same name as the bot)
+  </Step>
+
+  <Step title="Configure permissions">
+    Enable the following permissions for the bot's role:
+    - Kick Members
+    - Ban Members
+    - Moderate Members (for timeouts)
+    - Manage Messages
+    - Send Messages
+    - Embed Links
+    - Read Message History
+    - Add Reactions
+    - View Channels
+  </Step>
+
+  <Step title="Save changes">
+    Click **Save Changes** at the bottom of the page
+  </Step>
+</Steps>
+
+### Method 2: Bot permissions (Developer Portal)
+
+<Steps>
+  <Step title="Open the Developer Portal">
+    Go to the [Discord Developer Portal](https://discord.com/developers/applications) and select your application
+  </Step>
+
+  <Step title="Generate OAuth2 URL">
+    Navigate to **OAuth2** → **URL Generator**
+  </Step>
+
+  <Step title="Select scopes">
+    Check the following scopes:
+    - `bot`
+    - `applications.commands`
+  </Step>
+
+  <Step title="Select permissions">
+    Under **Bot Permissions**, select:
+    - Kick Members
+    - Ban Members
+    - Moderate Members
+    - Manage Messages
+    - Send Messages
+    - Embed Links
+    - Read Message History
+    - Add Reactions
+    - View Channels
+  </Step>
+
+  <Step title="Use the generated URL">
+    Copy the generated URL and use it to invite the bot to your server with the correct permissions
+  </Step>
+</Steps>
+
+## Permission details
+
+### Moderation permissions
+
+<Accordion title="Kick Members">
+  Required for the `/kick` command. Allows Aphonos to remove members from the server without banning them.
+</Accordion>
+
+<Accordion title="Ban Members">
+  Required for the `/ban` command. Allows Aphonos to permanently ban members from the server.
+</Accordion>
+
+<Accordion title="Moderate Members">
+  Required for the `/timeout` command. Allows Aphonos to temporarily timeout members, preventing them from sending messages or joining voice channels.
+</Accordion>
+
+### Management permissions
+
+<Accordion title="Manage Messages">
+  Critical for the `/clear` command and message archiving features. Allows Aphonos to delete messages and maintain message history.
+</Accordion>
+
+### Communication permissions
+
+<Accordion title="Send Messages">
+  Essential permission that allows Aphonos to send command responses and notifications in text channels.
+</Accordion>
+
+<Accordion title="Embed Links">
+  Required for sending rich embeds. Most Aphonos responses use embeds for better formatting and user experience.
+</Accordion>
+
+<Accordion title="Read Message History">
+  Necessary for the `/archives` command and message context. Allows Aphonos to access previous messages in channels.
+</Accordion>
+
+### Interactive permissions
+
+<Accordion title="Add Reactions">
+  Required for reaction role features and interactive commands. Allows Aphonos to add emoji reactions to messages.
+</Accordion>
+
+<Accordion title="View Channels">
+  Fundamental permission that allows Aphonos to see and access channels where it should operate.
+</Accordion>
+
+## Gateway Intents
+
+In addition to permissions, Aphonos requires the following Privileged Gateway Intents to be enabled in the Discord Developer Portal:
+
+<CodeGroup>
+```typescript Required intents
+// These intents are configured in src/index.ts
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,              // Guild information
+    GatewayIntentBits.GuildMessages,       // Message events
+    GatewayIntentBits.MessageContent,      // Read message content
+    GatewayIntentBits.GuildMembers,        // Member events
+    GatewayIntentBits.GuildModeration,     // Moderation events
+    GatewayIntentBits.GuildMessageReactions // Reaction events
+  ]
+});
+```
+</CodeGroup>
+
+### Enabling Privileged Intents
+
+<Steps>
+  <Step title="Go to Developer Portal">
+    Navigate to the [Discord Developer Portal](https://discord.com/developers/applications) and select your bot
+  </Step>
+
+  <Step title="Open Bot settings">
+    Click on the **Bot** tab in the left sidebar
+  </Step>
+
+  <Step title="Enable Privileged Intents">
+    Scroll down to the **Privileged Gateway Intents** section and enable:
+    - **Server Members Intent** (required for member join events and `/kick`, `/ban`, `/timeout`)
+    - **Message Content Intent** (required for reading message content)
+  </Step>
+
+  <Step title="Save changes">
+    Click **Save Changes**
+  </Step>
+</Steps>
+
+<Warning>
+  If your bot is in more than 100 servers, you'll need to verify your bot and apply for these intents through Discord.
+</Warning>
+
+## Role hierarchy
+
+For moderation commands to work properly, Aphonos's role must be positioned higher in the role hierarchy than the users it's moderating.
+
+<Steps>
+  <Step title="Open Server Settings">
+    Go to **Server Settings** → **Roles**
+  </Step>
+
+  <Step title="Drag the bot's role">
+    Drag Aphonos's role above the roles of users you want the bot to moderate
+  </Step>
+
+  <Step title="Important note">
+    The bot cannot moderate users with roles higher than or equal to its own role, including the server owner
+  </Step>
+</Steps>
+
+## Channel-specific permissions
+
+You can restrict Aphonos to specific channels using channel permission overrides:
+
+1. Right-click on a channel → **Edit Channel**
+2. Go to **Permissions** → Click **+** next to **Roles/Members**
+3. Select the Aphonos role
+4. Grant or deny specific permissions for that channel
+
+<Tip>
+  For moderation channels, ensure Aphonos has **View Channels**, **Send Messages**, and **Embed Links** permissions.
+</Tip>
+
+## Self-hosting recommendations
+
+If you're self-hosting Aphonos for your own server:
+
+<Warning>
+  For simplicity and full functionality, consider giving the bot **Administrator** permission. This grants all permissions and bypasses channel-specific overrides.
+  
+  However, only do this if you trust the bot's code and hosting environment, as Administrator permission is very powerful.
+</Warning>
+
+Alternatively, enable all individual permissions listed above to maintain granular control.
+
+## Troubleshooting permission issues
+
+<AccordionGroup>
+  <Accordion title="Bot cannot kick/ban users">
+    - Verify the bot has **Kick Members** or **Ban Members** permission
+    - Check that the bot's role is higher than the target user's role
+    - Ensure the target user is not the server owner
+  </Accordion>
+
+  <Accordion title="Bot cannot delete messages">
+    - Confirm the bot has **Manage Messages** permission
+    - Check for channel-specific permission overrides that may deny this permission
+  </Accordion>
+
+  <Accordion title="Bot responses are plain text instead of embeds">
+    - Make sure the bot has **Embed Links** permission
+    - Check channel-specific overrides
+  </Accordion>
+
+  <Accordion title="Bot cannot see certain channels">
+    - Verify the bot has **View Channels** permission
+    - Check channel-specific permission overrides
+    - Ensure the bot's role has access to the category if the channel is in one
+  </Accordion>
+</AccordionGroup>
+
+## Verifying permissions
+
+You can verify Aphonos's permissions by checking the startup logs:
+
+```bash Console output
+Permissions:
+================================
+Server: Your Server Name (ID: 123456789)
+  Text: #general (ID: 987654321) - CAN READ
+  Text: #moderation (ID: 192837465) - CAN READ
+================================
+```
+
+The bot logs its visibility and read access for all channels on startup, helping you identify any permission issues.

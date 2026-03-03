@@ -1,0 +1,353 @@
+---
+title: 'Bot Architecture'
+description: 'Understanding the Aphonos bot architecture and code structure'
+---
+
+## Overview
+
+Aphonos is built with TypeScript using Discord.js v14, featuring a modular command system and event-driven architecture. The bot is designed specifically for the ALTER EGO Wiki and Tower Defense Simulator Wiki Discord servers.
+
+## Core Architecture
+
+### AltershaperBot Class
+
+The main bot logic is encapsulated in the `AltershaperBot` class located in `src/index.ts:25`.
+
+```typescript
+class AltershaperBot {
+  private client: Client;
+  private readonly BOT_TOKEN = process.env.DISCORD_TOKEN;
+  private commands: Collection<string, Command>;
+  private readyPromise: Promise<void>;
+  private resolveReady!: () => void;
+
+  constructor() {
+    this.client = new Client({
+      intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildModeration,
+        GatewayIntentBits.GuildMessageReactions,
+      ],
+    });
+
+    this.readyPromise = new Promise((resolve) => {
+      this.resolveReady = resolve;
+    });
+
+    this.commands = loadCommands();
+    this.setupEventListeners();
+  }
+}
+```
+
+### Key Components
+
+#### 1. Discord Client
+
+The bot uses the Discord.js `Client` class with the following intents:
+
+- **Guilds**: Access to server information
+- **GuildMessages**: Read and send messages
+- **MessageContent**: Access message content (privileged intent)
+- **GuildMembers**: Track member joins and member data
+- **GuildModeration**: Handle kicks, bans, and timeouts
+- **GuildMessageReactions**: Reaction role functionality
+
+#### 2. Command System
+
+Commands are loaded via `loadCommands()` from `src/utils/commandLoader.ts:40` and stored in a Discord.js `Collection` for efficient lookup.
+
+#### 3. Event Listeners
+
+Event listeners are registered in `setupEventListeners()` at `src/index.ts:52`:
+
+```typescript
+private setupEventListeners(): void {
+  this.client.once("clientReady", async () => {
+    console.log(`Altershaper bot hath awakened as ${this.client.user?.tag}`);
+    this.client.user?.setActivity("Alter Egoists", { type: 3 });
+
+    this.logVisibleChannels();
+
+    await this.registerSlashCommands();
+    await ReactionRoleHandler.initialize(this.client);
+    InterServerChat.initialize(this.client);
+
+    this.resolveReady();
+  });
+
+  this.client.on("interactionCreate", (interaction) =>
+    handleInteraction(interaction, this.commands),
+  );
+  this.client.on("guildMemberAdd", handleMemberJoin);
+  this.client.on("messageReactionAdd", handleReactionAdd);
+  this.client.on("messageReactionRemove", handleReactionRemove);
+  this.client.on("messageCreate", (message) =>
+    InterServerChat.handleMessage(message),
+  );
+}
+```
+
+## Event Handlers
+
+Event handlers are defined in `src/utils/eventHandlers.ts` and handle the bot's responses to Discord events.
+
+### Interaction Handler
+
+Handles slash command interactions with permission checking (`src/utils/eventHandlers.ts:21`):
+
+```typescript
+export async function handleInteraction(
+  interaction: Interaction,
+  commands: Collection<string, Command>,
+): Promise<void> {
+  if (!interaction.isChatInputCommand()) return;
+
+  // Check command access
+  if (
+    !CommandAccessManager.canUseCommand(
+      interaction.commandName,
+      interaction.guildId,
+    )
+  ) {
+    await interaction.reply({
+      content: CommandAccessManager.getAccessDeniedMessage(),
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const command = commands.get(interaction.commandName);
+  if (!command) return;
+
+  const member = interaction.member as GuildMember;
+  if (!member) return;
+
+  // Check role permissions
+  if (
+    !RolePermissions.hasCommandPermission(member, interaction.commandName)
+  ) {
+    const errorMessage = RolePermissions.getPermissionErrorMessage(
+      interaction.commandName,
+    );
+    await interaction.reply({
+      content: errorMessage,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  // Execute command
+  await command.execute(interaction, member);
+}
+```
+
+### Member Join Handler
+
+Sends welcome messages when new members join (`src/utils/eventHandlers.ts:108`):
+
+```typescript
+export async function handleMemberJoin(member: GuildMember): Promise<void> {
+  const welcomeChannel = member.guild.channels.cache.get(
+    WELCOME_CHANNEL_ID,
+  ) as TextChannel;
+
+  if (welcomeChannel && welcomeChannel.type === ChannelType.GuildText) {
+    const embed = new EmbedBuilder()
+      .setColor("#00FF00")
+      .setTitle("🌟 A NEW SOUL ENTERS THE SACRED REALM")
+      .setDescription(
+        `**Welcome to the ALTER EGO Wiki Discord server, ${member.user.tag}!**\n\n...`,
+      )
+      .setThumbnail(member.user.displayAvatarURL())
+      .setTimestamp();
+
+    await welcomeChannel.send({ embeds: [embed] });
+  }
+}
+```
+
+### Reaction Handlers
+
+Handle reaction role functionality through `ReactionRoleHandler` (`src/utils/eventHandlers.ts:130`, `src/utils/eventHandlers.ts:158`).
+
+## Utility Systems
+
+### Command Loader
+
+The command loader (`src/utils/commandLoader.ts`) imports and registers all commands:
+
+```typescript
+export interface Command {
+  data: any;
+  execute: (...args: any[]) => Promise<void>;
+}
+
+export function loadCommands(): Collection<string, Command> {
+  const commands = new Collection<string, Command>();
+
+  const commandModules = [
+    kick,
+    ban,
+    timeout,
+    clear,
+    warn,
+    // ... all command modules
+  ];
+
+  for (const command of commandModules) {
+    commands.set(command.data.name, command);
+  }
+
+  return commands;
+}
+```
+
+### Reaction Role Handler
+
+Manages reaction roles for self-assignable roles via message reactions.
+
+### Console Handler
+
+Provides a command-line interface for bot administration, including commands like `reload`, `status`, `restart`, and `shutdown`.
+
+### Lock Manager
+
+Manages battle locks to prevent users from engaging in multiple concurrent battles.
+
+### Inter-Server Chat
+
+Facilitates cross-server chat channels between linked Discord servers.
+
+### Moderation Logger
+
+Tracks all moderation actions with unique IDs (e.g., W1, K1, B1, T1, C1) for kicks, bans, timeouts, warnings, and message clears.
+
+## Bot Lifecycle Methods
+
+### start()
+
+Initializes the bot and logs in to Discord (`src/index.ts:172`):
+
+```typescript
+public async start(): Promise<void> {
+  if (!this.BOT_TOKEN) {
+    console.error("❌ Discord token not found in environment variables");
+    process.exit(1);
+  }
+
+  try {
+    await this.client.login(this.BOT_TOKEN);
+  } catch (error) {
+    console.error("❌ Failed to login:", error);
+    process.exit(1);
+  }
+
+  // Graceful shutdowns
+  process.on("SIGINT", () => {
+    console.log("Shutting down gracefully...");
+    this.client.destroy();
+    process.exit(0);
+  });
+}
+```
+
+### registerSlashCommands()
+
+Registers all slash commands globally with Discord (`src/index.ts:149`):
+
+```typescript
+private async registerSlashCommands(): Promise<void> {
+  const commandData = Array.from(this.commands.values()).map(
+    (command) => command.data,
+  );
+  const rest = new REST({ version: "10" }).setToken(this.BOT_TOKEN!);
+
+  try {
+    console.log("Registering divine slash commands...");
+
+    await rest.put(Routes.applicationCommands(this.client.user!.id), {
+      body: commandData,
+    });
+
+    console.log("Divine slash commands registered successfully!");
+  } catch (error) {
+    console.error("Failed to register slash commands:", error);
+  }
+}
+```
+
+### reloadSlashCommands()
+
+Reloads commands without restarting the bot (`src/index.ts:199`).
+
+### restart()
+
+Performs a full internal restart of the bot (`src/index.ts:223`).
+
+### shutdown()
+
+Gracefully shuts down the bot (`src/index.ts:217`).
+
+## Technology Stack
+
+- **Runtime**: Node.js with ES Modules
+- **Language**: TypeScript 5.9+
+- **Discord Library**: Discord.js v14.25+
+- **Target**: ES2022
+- **Module System**: ESNext with `.js` extensions in imports
+- **Image Processing**: Canvas for battle graphics and ship compatibility images
+
+## Project Structure
+
+```
+src/
+├── index.ts              # Main bot class and entry point
+├── commands/             # All command implementations
+│   ├── kick.ts
+│   ├── ban.ts
+│   ├── avatar.ts
+│   └── ...
+└── utils/                # Utility modules
+    ├── commandLoader.ts  # Command registration
+    ├── eventHandlers.ts  # Event handling logic
+    ├── reactionRoleHandler.ts
+    ├── consoleHandler.ts
+    ├── lockManager.ts
+    └── ...
+```
+
+## Environment Variables
+
+The bot requires the following environment variable:
+
+- `DISCORD_TOKEN`: Your Discord bot token from the Developer Portal
+
+Optional:
+- Additional configuration may be needed for specific features like inter-server chat
+
+## Build System
+
+The bot uses TypeScript compiler with the following configuration:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "moduleResolution": "node",
+    "esModuleInterop": true
+  }
+}
+```
+
+Build process:
+1. TypeScript compilation: `tsc`
+2. Asset copying: Image files for commands
+3. Output: `dist/` directory

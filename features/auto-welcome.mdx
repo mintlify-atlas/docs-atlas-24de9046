@@ -1,0 +1,200 @@
+---
+title: 'Auto Welcome'
+description: 'Automatically welcome new members with customized messages'
+icon: 'door-open'
+---
+
+## Overview
+
+Aphonos automatically sends a themed welcome message when new members join the Discord server. The welcome system uses embeds with custom styling to create an engaging first impression.
+
+## How It Works
+
+When a new member joins the server, Aphonos:
+
+1. Detects the `guildMemberAdd` event
+2. Fetches the configured welcome channel
+3. Creates a themed embed with member information
+4. Sends the welcome message to the channel
+
+## Welcome Message
+
+The welcome message is sent as an embedded message with the following features:
+
+### Message Content
+
+From `eventHandlers.ts:114`:
+
+```typescript
+const embed = new EmbedBuilder()
+  .setColor("#00FF00")
+  .setTitle("🌟 A NEW SOUL ENTERS THE SACRED REALM")
+  .setDescription(
+    `**Welcome to the ALTER EGO Wiki Discord server, ${member.user.tag}!**\n\n` +
+    `Thou hast entered the sacred halls of Alteruism!\n` +
+    `Here we honour our alter egos and embrace the righteous path!\n\n` +
+    `Read the sacred laws and contribute to our divine mission!\n` +
+    `Know that defiance of Alteruism shall bring righteous correction!`
+  )
+  .setThumbnail(member.user.displayAvatarURL())
+  .setFooter({
+    text: "BOUND BY DUTY TO HONOUR OUR DIVINE ALTER EGO, WE ARE ALTER EGOISTS."
+  })
+  .setTimestamp();
+```
+
+### Visual Elements
+
+- **Color**: Green (`#00FF00`) for a welcoming appearance
+- **Title**: Themed greeting message with emoji
+- **Description**: Multi-line welcome text with server information
+- **Thumbnail**: Member's Discord avatar
+- **Footer**: Server motto/tagline
+- **Timestamp**: Exact time the member joined
+
+<Info>
+  The welcome message uses a unique thematic style that matches the ALTER EGO Wiki's lore and community culture.
+</Info>
+
+## Configuration
+
+### Welcome Channel
+
+The welcome channel is hardcoded in the bot's configuration:
+
+```typescript
+const WELCOME_CHANNEL_ID = "1366495690796040315";
+```
+
+This channel must:
+- Exist in the server
+- Be a text channel (`ChannelType.GuildText`)
+- Be accessible to the bot
+
+<Warning>
+  If the welcome channel is deleted or the bot loses access, welcome messages will fail silently. Ensure the bot has **View Channel** and **Send Messages** permissions.
+</Warning>
+
+### Customizing the Message
+
+To customize the welcome message, modify the embed configuration in `src/utils/eventHandlers.ts:114`:
+
+- **Title**: Change the `.setTitle()` value
+- **Description**: Modify the text in `.setDescription()`  
+- **Color**: Adjust the hex color in `.setColor()`
+- **Footer**: Update the `.setFooter()` text
+- **Thumbnail**: Change from avatar to server icon with `.setThumbnail(member.guild.iconURL())`
+
+## Event Integration
+
+The welcome system integrates with Discord.js events through the main bot file:
+
+```typescript
+client.on('guildMemberAdd', async (member: GuildMember) => {
+  await handleMemberJoin(member);
+});
+```
+
+The `handleMemberJoin` function (eventHandlers.ts:108):
+
+1. Receives the `GuildMember` object
+2. Fetches the welcome channel from the guild's channel cache
+3. Validates the channel exists and is a text channel
+4. Creates and sends the welcome embed
+
+## Implementation Details
+
+### Key Files
+
+- `src/utils/eventHandlers.ts` - Member join handler (eventHandlers.ts:108)
+- Main bot file - Event listener registration
+
+### Error Handling
+
+The welcome system handles several edge cases:
+
+- **Channel not found**: If the welcome channel doesn't exist, the function silently returns
+- **Wrong channel type**: Validates the channel is a text channel before sending
+- **Member object**: Uses the full `GuildMember` object (not partial) for avatar and tag
+
+<Note>
+  The welcome system does not send DMs to new members. All welcome messages are posted in the public welcome channel.
+</Note>
+
+## Required Permissions
+
+The bot needs these permissions in the welcome channel:
+
+- **View Channel**: To see the channel
+- **Send Messages**: To post welcome messages
+- **Embed Links**: To send embedded messages
+- **Attach Files**: For avatar thumbnails (external images)
+
+## Extending the System
+
+### Adding Welcome Roles
+
+You can extend the welcome handler to automatically assign roles:
+
+```typescript
+export async function handleMemberJoin(member: GuildMember): Promise<void> {
+  // Send welcome message
+  // ...
+  
+  // Auto-assign role
+  const welcomeRole = member.guild.roles.cache.get('ROLE_ID');
+  if (welcomeRole) {
+    await member.roles.add(welcomeRole);
+  }
+}
+```
+
+### Multiple Welcome Channels
+
+To support different welcome messages for different scenarios:
+
+1. Store channel IDs in a configuration file
+2. Add logic to determine which channel to use
+3. Create different embed templates for each use case
+
+### Conditional Welcomes
+
+You can add conditions to skip or modify welcomes:
+
+```typescript
+// Skip welcome for bots
+if (member.user.bot) return;
+
+// Different message for returning members  
+const isReturning = /* check join history */;
+if (isReturning) {
+  // Send "welcome back" message
+}
+```
+
+## Best Practices
+
+1. **Keep messages concise**: New members may be overwhelmed by too much text
+2. **Include useful links**: Add server rules, guide channels, or resources
+3. **Test permissions**: Ensure the bot can always access the welcome channel
+4. **Monitor channel**: Regularly check that welcome messages are being sent
+5. **Match server theme**: Keep the message style consistent with your community
+
+## Troubleshooting
+
+### Welcome messages not sending
+
+1. Check that the welcome channel ID is correct
+2. Verify the bot has Send Messages and Embed Links permissions
+3. Ensure the channel hasn't been deleted or archived
+4. Check bot logs for error messages
+
+### Missing avatars in thumbnails
+
+This usually indicates:
+- The member's avatar failed to load (retry later)
+- The bot lacks "Attach Files" or "Embed Links" permission
+
+### Wrong channel receiving messages
+
+Update the `WELCOME_CHANNEL_ID` constant in `eventHandlers.ts:19` to the correct channel ID.

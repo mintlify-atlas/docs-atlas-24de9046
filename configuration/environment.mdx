@@ -1,0 +1,124 @@
+---
+title: Environment Variables
+description: Configure Aphonos bot with environment variables and setup instructions
+---
+
+## Required Environment Variables
+
+Aphonos requires a `.env` file in the root directory with the following configuration:
+
+### DISCORD_TOKEN
+
+The Discord bot token is the only required environment variable for Aphonos to function.
+
+<CodeGroup>
+```bash .env
+DISCORD_TOKEN=your_discord_bot_token_here
+```
+
+```bash Example
+DISCORD_TOKEN=MTM2NjUwOTg5MjM4NjU1Mzg2Ng.GxXxXx.xXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxX
+```
+</CodeGroup>
+
+<Warning>
+  The bot will immediately exit with an error if `DISCORD_TOKEN` is not found in environment variables. This is validated in `src/index.ts:173-176`.
+</Warning>
+
+## Getting Your Discord Token
+
+1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
+2. Select your application or create a new one
+3. Navigate to the **Bot** section
+4. Copy the token under **TOKEN**
+5. If you don't see a token, click **Reset Token** to generate a new one
+
+<Warning>
+  Never commit your `.env` file to version control. Keep your Discord token secret and regenerate it immediately if it's ever exposed.
+</Warning>
+
+## Setup Steps
+
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Create Environment File
+
+Create a `.env` file in the project root:
+
+```bash
+echo "DISCORD_TOKEN=your_token_here" > .env
+```
+
+### 3. Build the Bot
+
+```bash
+npm run build
+```
+
+This compiles TypeScript and copies required image assets (`webhook.png`, `ship.png`, `ship2.png`, `deathbattle.png`, `deathbattle2.png`, `deathbattle3.png`, `russian.png`) to the dist folder.
+
+### 4. Start the Bot
+
+<CodeGroup>
+```bash Production
+npm start
+```
+
+```bash Development
+npm run dev
+```
+</CodeGroup>
+
+## NPM Scripts
+
+Aphonos includes several npm scripts for different use cases:
+
+| Script | Command | Description |
+|--------|---------|-------------|
+| `build` | `npm run build` | Compiles TypeScript and copies image assets to dist/ |
+| `start` | `npm start` | Runs the compiled bot from dist/index.js |
+| `dev` | `npm run dev` | Runs the bot in development mode with tsx (no build required) |
+| `watch` | `npm run watch` | Watches for TypeScript changes and recompiles automatically |
+| `format` | `npm run format` | Formats code with Prettier |
+
+## Discord Bot Intents
+
+Aphonos requires the following Gateway Intents (configured in `src/index.ts:34-41`):
+
+- **Guilds** - Access to guild information
+- **GuildMessages** - Receive message events
+- **MessageContent** - Read message content (privileged intent)
+- **GuildMembers** - Access member join/leave events (privileged intent)
+- **GuildModeration** - Access moderation events
+- **GuildMessageReactions** - Reaction role functionality
+
+<Warning>
+  **MessageContent** and **GuildMembers** are privileged intents. Enable them in the Discord Developer Portal under Bot > Privileged Gateway Intents.
+</Warning>
+
+## Validation
+
+When the bot starts successfully, you should see:
+
+```
+Altershaper bot hath awakened as YourBotName#1234
+Registering divine slash commands...
+Divine slash commands registered successfully!
+Console command handler ready. Type "help" for options.
+```
+
+If the token is missing or invalid:
+
+```
+❌ Discord token not found in environment variables
+```
+
+or
+
+```
+❌ Failed to login: [error details]
+```

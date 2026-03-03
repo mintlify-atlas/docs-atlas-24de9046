@@ -1,0 +1,136 @@
+---
+title: Role ID Configuration
+description: Discord role IDs used by Aphonos for permissions and role synchronization
+---
+
+## Overview
+
+Aphonos uses hardcoded Discord role IDs for various functionality including Fandom wiki role synchronization, edit count milestones, and special role assignments. All role IDs are defined in `src/utils/roleConstants.ts`.
+
+<Warning>
+  Role IDs are hardcoded for the ALTER EGO Wiki Discord server. If you're self-hosting, you'll need to update these IDs to match your server's roles.
+</Warning>
+
+## Fandom Wiki Roles
+
+These roles correspond to Fandom wiki permission groups and are automatically assigned when users link their wiki accounts:
+
+```typescript
+const FANDOM_ROLE_MAP = {
+  threadmoderator: "1366509892386553866",
+  "content-moderator": "1366510432168185926",
+  sysop: "1366509321340588162",
+  bureaucrat: "1366507366681673920"
+}
+```
+
+| Role Name | Role ID | Fandom Permission Level |
+|-----------|---------|-------------------------|
+| Thread Moderator | `1366509892386553866` | Thread moderator permissions on wiki |
+| Content Moderator | `1366510432168185926` | Content moderator permissions on wiki |
+| Sysop (Admin) | `1366509321340588162` | Administrator permissions on wiki |
+| Bureaucrat | `1366507366681673920` | Bureaucrat permissions on wiki |
+
+## Primary Roles
+
+### Linked Role
+```typescript
+LINKED_ROLE_ID = "1384535350621241466"
+```
+Assigned to users who have successfully linked their Discord account with their Fandom wiki account.
+
+### Top Contributors
+```typescript
+TOP_CONTRIBUTORS_ROLE_ID = "1380538701309808700"
+```
+Assigned to users recognized as top contributors to the wiki.
+
+### Staff Role
+```typescript
+STAFF_ROLE_ID = "1396337681159557233"
+```
+General staff role for wiki/server staff members.
+
+## Edit Count Milestone Roles
+
+These roles are awarded based on user edit counts on the wiki:
+
+```typescript
+const EDIT_COUNT_ROLES = {
+  EDITS_250: "1387921308611772469",
+  EDITS_1000: "1397063382552809613"
+}
+```
+
+| Milestone | Role ID | Requirement |
+|-----------|---------|-------------|
+| 250 Edits | `1387921308611772469` | User has made 250+ edits |
+| 1,000 Edits | `1397063382552809613` | User has made 1,000+ edits |
+
+## Wiki Sync Roles
+
+Special roles that are synchronized from the wiki or awarded for specific achievements:
+
+```typescript
+const WIKI_SYNC_ROLES = {
+  BOT: "1380026086238326935",
+  ACTIVITY_WINNER: "1397058327367782565",
+  PARADOXUM: "1387813722172686526",
+  AE_STAFF: "1387459107375677490",
+  CONTENT_CREATOR: "1390585342624665680",
+  FIRST_VICTIM: "1396336120069095465",
+  SERVER_BOOSTER: "1387661205816217633",
+  DICTATOR: "1366507966932455524",
+  INTERWIKI_STAFF: "1460002677382709328"
+}
+```
+
+| Role Name | Role ID | Description |
+|-----------|---------|-------------|
+| Bot | `1380026086238326935` | Bot accounts |
+| Activity Winner | `1397058327367782565` | Winners of activity competitions |
+| Paradoxum | `1387813722172686526` | Special recognition role |
+| AE Staff | `1387459107375677490` | ALTER EGO Wiki staff |
+| Content Creator | `1390585342624665680` | Content creators for the wiki |
+| First Victim | `1396336120069095465` | Special early supporter role |
+| Server Booster | `1387661205816217633` | Discord server boosters |
+| Dictator | `1366507966932455524` | Highest permission level |
+| Interwiki Staff | `1460002677382709328` | Staff members managing multiple wikis |
+
+## External Wiki Roles
+
+### Tower Defense Simulator Wiki Staff
+```typescript
+TDS_WIKI_STAFF = "827531372120768513"
+```
+Role ID for Tower Defense Simulator Wiki staff members.
+
+## Finding Role IDs in Discord
+
+To get role IDs from your Discord server:
+
+1. Enable Developer Mode in Discord:
+   - User Settings > Advanced > Developer Mode
+
+2. Right-click any role in:
+   - Server Settings > Roles, or
+   - A user's profile showing their roles
+
+3. Click **Copy ID**
+
+<Warning>
+  After updating role IDs in `src/utils/roleConstants.ts`, you must rebuild the bot with `npm run build` and restart it for changes to take effect.
+</Warning>
+
+## Usage in Code
+
+Role IDs are imported and used throughout the codebase:
+
+```typescript
+import { 
+  FANDOM_ROLE_MAP, 
+  LINKED_ROLE_ID, 
+  EDIT_COUNT_ROLES,
+  WIKI_SYNC_ROLES 
+} from './utils/roleConstants.js';
+```
