@@ -265,3 +265,226 @@ The command displays:
 <Note>
   Action IDs are case-insensitive. You can use "w1", "W1", "k5", or "K5" interchangeably.
 </Note>
+
+---
+
+## Admin Commands
+
+The following commands require elevated permissions and are restricted to administrators.
+
+### /giveaway
+
+Create interactive giveaways with automatic winner selection.
+
+<ParamField path="prize" type="String" required>
+  The prize to be given away
+</ParamField>
+
+<ParamField path="days" type="Integer">
+  Duration in days (0-7)
+</ParamField>
+
+<ParamField path="hours" type="Integer">
+  Duration in hours (0-168)
+</ParamField>
+
+<ParamField path="minutes" type="Integer">
+  Duration in minutes (0-10080)
+</ParamField>
+
+<ParamField path="winners" type="Integer">
+  Number of winners to select (defaults to 1)
+</ParamField>
+
+**Features:**
+- Participants enter by clicking a button
+- Automatic countdown timer
+- Random winner selection at end
+- Cannot enter multiple times
+- Displays participant count
+
+**Duration:** Combines days, hours, and minutes. If no duration specified, defaults to appropriate time.
+
+---
+
+### /webhook
+
+Manage bot webhooks for automated messaging.
+
+#### Subcommands
+
+**create**
+<ParamField path="channel" type="Channel" required>
+  Channel to create webhook in
+</ParamField>
+
+<ParamField path="name" type="String">
+  Custom name for the webhook (optional)
+</ParamField>
+
+**delete**
+<ParamField path="name" type="String">
+  Name of the webhook to delete
+</ParamField>
+
+**test**
+<ParamField path="message" type="String">
+  Test message to send through webhook
+</ParamField>
+
+**list**
+- Lists all webhooks in the server
+
+```typescript
+// From webhook.ts:8-50
+export const data = new SlashCommandBuilder()
+  .setName("webhook")
+  .setDescription("Manage the bot's webhooks for automated messaging")
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("create")
+      .setDescription("Create a new webhook in a channel")
+  )
+```
+
+---
+
+### /reactionrole
+
+Manage reaction role rules for automatic role assignment.
+
+#### Subcommands
+
+**add**
+
+Create a new reaction role rule.
+
+<ParamField path="message-id" type="String" required>
+  ID of the message to watch
+</ParamField>
+
+<ParamField path="emoji" type="String" required>
+  Emoji to react with (Unicode or custom :emoji_name:)
+</ParamField>
+
+<ParamField path="role" type="Role" required>
+  Role to assign when users react
+</ParamField>
+
+<ParamField path="unreact" type="Boolean">
+  Remove reaction after adding role (defaults to false)
+</ParamField>
+
+**remove**
+
+Delete an existing reaction role rule.
+
+<ParamField path="message-id" type="String" required>
+  Message ID of the rule to remove
+</ParamField>
+
+<ParamField path="emoji" type="String" required>
+  Emoji of the rule to remove
+</ParamField>
+
+**list**
+
+Display all active reaction role rules in the server.
+
+**Features:**
+- Supports both Unicode emoji (🎮) and custom emoji (:custom:)
+- Optional automatic unreact after role assignment
+- Rules persist across bot restarts
+- Stored in JSON per guild
+
+---
+
+### /interchat
+
+Create and manage cross-server chat pools using webhooks.
+
+#### Subcommands
+
+**create**
+
+Create a new inter-server chat pool.
+
+<ParamField path="poolname" type="String" required>
+  Name for the chat pool
+</ParamField>
+
+Returns a UUID that other servers use to join.
+
+**join**
+
+Join an existing chat pool.
+
+<ParamField path="poolid" type="String" required>
+  UUID of the pool to join
+</ParamField>
+
+**leave**
+
+Leave the current chat pool.
+
+**info**
+
+Display information about the current pool.
+
+**rename**
+
+Rename the current server's display name in the pool.
+
+<ParamField path="newname" type="String" required>
+  New display name for your server
+</ParamField>
+
+**delete**
+
+Delete the chat pool (only pool creator can use this).
+
+**Features:**
+- Webhook-based message relaying
+- Preserves message attachments and embeds
+- Shows server origin for each message
+- Reply context maintained across servers
+- UUID-based pool identification
+
+```typescript
+// From interServerChat.ts
+- Pools stored in JSON
+- Each server can only be in one pool
+- Messages relayed via webhooks for seamless appearance
+```
+
+---
+
+### /removelink
+
+Sever the link between a Discord account and Fandom wiki account (admin only).
+
+<ParamField path="user" type="User" required>
+  The Discord user to unlink from Fandom
+</ParamField>
+
+**Effects:**
+- Removes link from database
+- Removes all Fandom-granted roles:
+  - Staff roles (Thread Moderator, Content Moderator, Sysop, Bureaucrat)
+  - Linked role
+  - Staff parent role
+  - Edit count roles (250+, 1000+)
+  - Top Contributors role
+
+**Confirmation:**
+- Requires button confirmation within 60 seconds
+- Shows which roles will be removed
+- Irreversible once confirmed
+
+<Warning>
+  This is an administrative action. Only use this for legitimate reasons such as account security or user requests. The user will need to re-link their account via `/link` to restore wiki integration.
+</Warning>
+
+<Info>
+  Unlike `/link` which users run themselves, `/removelink` is admin-only and used for moderation or account management purposes.
+</Info>

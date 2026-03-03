@@ -6,6 +6,88 @@ icon: 'gamepad'
 
 Fun commands provide entertainment and interactive features for server members.
 
+## /anime
+
+Fetch random anime images from the archives with optional tag filtering.
+
+<ParamField path="include" type="String">
+  Include specific tags (comma-separated, e.g: girl, long_hair)
+</ParamField>
+
+<ParamField path="exclude" type="String">
+  Exclude specific tags (comma-separated, e.g: boy, short_hair)
+</ParamField>
+
+<ParamField path="rating" type="String">
+  Content rating filter (only available if ANIME_RATING_MODE=true in environment)
+  - Safe
+  - Suggestive
+  - Borderline
+  - Explicit
+</ParamField>
+
+### Features
+
+- Uses the Anime Pictures API (`https://anime-pictures.net`)
+- Tag-based filtering for precise results
+- Optional content rating restrictions
+- Returns random images matching criteria
+
+<Note>
+  The rating parameter is only available when `ANIME_RATING_MODE=true` is set in the environment configuration.
+</Note>
+
+---
+
+## /avatar
+
+Display a user's avatar and banner (if available).
+
+<ParamField path="user" type="User">
+  The user whose avatar to view (defaults to command executor)
+</ParamField>
+
+### Display Format
+
+Shows:
+- High-resolution avatar (512px)
+- Animated GIF support for Nitro users
+- User banner if available (1024px)
+- User's hex accent color as embed color
+- Direct download links
+
+```typescript
+// From avatar.ts:25-30
+const isAnimatedAvatar = targetUser.avatar?.startsWith("a_");
+const avatarURL = targetUser.displayAvatarURL({
+  size: 512,
+  extension: isAnimatedAvatar ? "gif" : "png",
+});
+```
+
+---
+
+## /asset
+
+Generate a download link for a Roblox asset by ID.
+
+<ParamField path="id" type="String" required>
+  The Roblox asset ID to download
+</ParamField>
+
+### Features
+
+- Generates direct download links for Roblox assets
+- Uses the johnmarctumulak.com Roblox API
+- Supports all public asset types
+- Returns downloadable file links
+
+<Warning>
+  This command relies on a third-party service. If the external API is down, the command will fail.
+</Warning>
+
+---
+
 ## /aura
 
 Calculate a user's aura strength and generate fighter statistics based on their display name.
@@ -186,6 +268,75 @@ await BattleStatsManager.recordBattle(
 
 ---
 
+## /battlestats
+
+View battle statistics and leaderboards for the deathbattle system.
+
+### Subcommands
+
+#### user
+
+View a user's battle statistics.
+
+<ParamField path="user" type="User">
+  The warrior whose stats to view (defaults to yourself)
+</ParamField>
+
+<ParamField path="mode" type="String">
+  View normal, ranked, or all stats (defaults to normal)
+  - Normal: Casual battle stats
+  - Ranked: Competitive battle stats
+  - All: Combined statistics
+</ParamField>
+
+**Stats Displayed:**
+- Total wins and losses
+- Win rate percentage
+- Total games played
+- Last game timestamp
+- Win-Loss ratio
+- Current streak (wins or losses)
+- Longest win streak
+- Longest loss streak
+- Weighted Score (for ranked mode)
+
+#### leaderboard
+
+View the top warriors leaderboard.
+
+<ParamField path="mode" type="String">
+  View normal or ranked leaderboard (defaults to normal)
+  - Normal: Casual battle rankings
+  - Ranked: Competitive battle rankings
+</ParamField>
+
+<ParamField path="limit" type="Integer">
+  Number of entries to show (1-100, defaults to 10)
+</ParamField>
+
+**Leaderboard Format:**
+- Rank position
+- User tag
+- Win-Loss record
+- Win rate percentage
+- Weighted Score (ranked mode only)
+
+```typescript
+// From battlestats.ts:31-40
+.addStringOption((option) =>
+  option
+    .setName("mode")
+    .setDescription("View normal, ranked, or all stats")
+    .addChoices(
+      { name: "Normal", value: "normal" },
+      { name: "Ranked", value: "ranked" },
+      { name: "All", value: "all" },
+    )
+)
+```
+
+---
+
 ## /ship
 
 Calculate compatibility between two users.
@@ -339,6 +490,64 @@ Tracked data:
 <Warning>
   Only one Russian Roulette game can be active per server. Players cannot participate in multiple games simultaneously.
 </Warning>
+
+---
+
+## /russianstats
+
+View Russian Roulette statistics and leaderboards.
+
+### Subcommands
+
+#### user
+
+View a user's Russian Roulette statistics.
+
+<ParamField path="user" type="User">
+  The player whose stats to view (defaults to yourself)
+</ParamField>
+
+**Stats Displayed:**
+- Total wins and losses
+- Win rate percentage
+- Total games played
+- Last game timestamp
+- Win-Loss ratio
+- Current streak (wins or losses)
+- Longest win streak
+- Longest loss streak
+- Recent match history (last 5 games)
+
+```typescript
+// From russianstats.ts:44-60
+embed.addFields(
+  { name: "🏆 Wins", value: stats.wins.toString(), inline: true },
+  { name: "💀 Losses", value: stats.losses.toString(), inline: true },
+  { name: "📈 Win Rate", value: `${stats.winRate}%`, inline: true },
+  { name: "🎯 Total Games", value: stats.totalGames.toString(), inline: true },
+  { name: "🗓️ Last Game", value: formatRelativeTimestamp(stats.lastGameAt), inline: true },
+  { name: "⚖️ Ratio", value: `${stats.wins}W-${stats.losses}L`, inline: true },
+);
+```
+
+#### leaderboard
+
+View the top Russian Roulette players leaderboard.
+
+<ParamField path="limit" type="Integer">
+  Number of entries to show (1-100, defaults to 10)
+</ParamField>
+
+**Leaderboard Format:**
+- Rank position
+- User tag
+- Win-Loss record
+- Win rate percentage
+- Total games played
+
+<Info>
+  Leaderboard is sorted by wins first, then by win rate as a tiebreaker.
+</Info>
 
 ---
 

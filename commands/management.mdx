@@ -242,3 +242,154 @@ The response embed changes based on the action:
 <Note>
   Slowmode applies to all users except those with Manage Channel or Manage Messages permissions.
 </Note>
+
+---
+
+## /sins
+
+View moderation history and records for users or the entire server.
+
+<ParamField path="user" type="User">
+  The user whose moderation records to view (omit for global server history)
+</ParamField>
+
+### Display Modes
+
+#### User-Specific History
+
+Shows all moderation actions for a specific user:
+- Ban records (B#)
+- Kick records (K#)
+- Timeout records (T#)
+- Warning records (W#)
+- Clear action records (C#)
+
+Each entry includes:
+- Action type and ID
+- Timestamp
+- Moderator who executed the action
+- Reason provided
+
+#### Global Server History
+
+Shows recent moderation actions across the entire server (paginated):
+- Last 10 actions by default
+- Includes all moderation types
+- Sorted by most recent first
+- Interactive pagination with Next/Previous buttons
+
+```typescript
+// From sins.ts:16-23
+export const data = new SlashCommandBuilder()
+  .setName("sins")
+  .setDescription("Behold the records of the damned, no parameters shows global sins")
+  .addUserOption((option) =>
+    option
+      .setName("user")
+      .setDescription("The soul whose sins thou seekest to view")
+      .setRequired(false),
+  );
+```
+
+### Clean Record Response
+
+If a user has no moderation history:
+- Green embed color
+- "Clean slate" message
+- Encourages others to follow their example
+
+<Info>
+  All moderation actions are automatically logged to the sins database with unique Action IDs for easy reference and reversal via `/removesin`.
+</Info>
+
+---
+
+## /help
+
+Display an interactive paginated guide to all bot commands.
+
+**No parameters required**
+
+### Features
+
+- **5 pages** organized by permission level and category
+  - Page 1: Admin Commands (ALTERMINISTRATOR)
+  - Page 2: Moderator Commands
+  - Page 3-5: Basic Commands (split across 3 pages)
+
+- **Interactive Navigation:**
+  - ⏮️ First (jump to Admin page)
+  - ◀️ Previous
+  - Next ▶️
+  - ⏭️ Last (jump to Basic 3 page)
+
+- **5-minute timeout** - buttons disable after 5 minutes of inactivity
+
+### Command Format
+
+Each command is displayed with:
+- Command syntax with parameters
+- Brief description
+- Permission level indicator
+
+```typescript
+// From help.ts:22-183
+const commands: CommandInfo[] = [
+  // Admin commands
+  { name: "/ban @user [-reason]", value: "Eternal banishment for heretical defiance", category: "admin" },
+  { name: "/interchat >subcommand", value: "Create a chatroom across servers", category: "admin" },
+  // ... and more
+];
+```
+
+<Note>
+  Only the user who invoked `/help` can use the navigation buttons. Others attempting to click will receive an ephemeral error message.
+</Note>
+
+---
+
+## /info
+
+Display bot information including version, uptime, and latest GitHub commit.
+
+**No parameters required**
+
+### Displayed Information
+
+- **Bot Name:** Aphonos
+- **Bot Description:** Divine enforcer of Alteruism
+- **Latest Commit:**
+  - Commit SHA (7 characters)
+  - Commit message (first line)
+  - Commit date and time
+  - GitHub link to commit
+
+- **Technology Stack:**
+  - Discord.js v14
+  - Node.js runtime
+  - TypeScript
+
+- **Links:**
+  - GitHub Repository
+  - Server Invite
+  - Support resources
+
+```typescript
+// From info.ts:27-39
+const response = await fetch(
+  "https://api.github.com/repos/Paradoxum-Wikis/ALTERSHAPER-Bot/commits/main",
+);
+
+if (response.ok) {
+  const data = (await response.json()) as GitHubCommit;
+  const commitDate = new Date(data.commit.author.date);
+  const commitMessage = data.commit.message.split("\n")[0];
+  const commitSha = data.sha.substring(0, 7);
+  
+  commitInfo = `**[${commitSha}](${data.html_url})** - ${commitMessage}`;
+}
+```
+
+<Info>
+  The info command fetches live data from the GitHub API to always show the most recent commit information.
+</Info>

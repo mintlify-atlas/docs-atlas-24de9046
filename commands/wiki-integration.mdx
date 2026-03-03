@@ -350,3 +350,120 @@ Fetches weekly contribution data to determine top 5 contributors for role assign
 <Warning>
   All wiki integration commands require the bot to be in a guild context. They cannot be used in DMs.
 </Warning>
+
+---
+
+## /family
+
+Manage family relationships and view family trees with visual rendering.
+
+### Subcommands
+
+#### tree
+
+View a visual family tree diagram.
+
+<ParamField path="user" type="User">
+  The user whose family tree to view (defaults to yourself)
+</ParamField>
+
+Generates a visual family tree using Canvas with:
+- User avatars
+- Relationship lines
+- Generational layout
+- PNG image output
+
+#### profile
+
+View family relationships as a text list.
+
+<ParamField path="user" type="User">
+  The user whose family profile to view (defaults to yourself)
+</ParamField>
+
+Lists:
+- Spouse (if married)
+- Parents (if any)
+- Children (if any)
+- Total family member count
+
+#### marry
+
+Propose marriage to another user (requires mutual consent).
+
+<ParamField path="user" type="User" required>
+  The user you want to marry
+</ParamField>
+
+**Requirements:**
+- Neither user can already be married
+- Both users must accept within 60 seconds
+- Cannot marry yourself
+- Cannot marry bots
+
+#### divorce
+
+Divorce your current spouse.
+
+<ParamField path="user" type="User" required>
+  Your spouse to divorce
+</ParamField>
+
+**Requirements:**
+- Must be married to the specified user
+- Removes spouse relationship immediately
+- No confirmation required
+
+#### adopt
+
+Adopt another user as your child (requires mutual consent).
+
+<ParamField path="user" type="User" required>
+  The user you want to adopt
+</ParamField>
+
+**Requirements:**
+- User cannot already have parents
+- If you're married, your spouse must also consent
+- Both parties must accept within 60 seconds
+- Cannot adopt yourself or bots
+
+#### disown
+
+Remove a parent-child relationship.
+
+<ParamField path="user" type="User" required>
+  The family member to disown (your child or your parent)
+</ParamField>
+
+**Behavior:**
+- Parents can disown children
+- Children can disown parents
+- Removes relationship immediately
+- No confirmation required
+
+### Family Tree Renderer
+
+```typescript
+// From familyTreeRenderer.ts
+- Uses Canvas for image generation
+- Displays user avatars in circular frames
+- Draws relationship lines between family members
+- Arranges members by generation (grandparents → parents → children)
+- Maximum 50 family members displayed
+```
+
+### Data Storage
+
+Family relationships are stored in JSON files:
+- Each guild has separate family data
+- Relationships persist across bot restarts
+- Stored at `./family-data-{guildId}.json`
+
+<Info>
+  The family system is entirely separate from Fandom wiki integration. It's a fun social feature for server members.
+</Info>
+
+<Note>
+  Family relationships are server-specific. If a user is in multiple servers with the bot, they can have different families in each.
+</Note>
