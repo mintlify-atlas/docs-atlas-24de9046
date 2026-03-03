@@ -1,0 +1,107 @@
+{
+  "projectType": "general",
+  "projectName": "Aphonos Bot",
+  "projectDescription": "A Discord moderation and utility bot for ALTER EGO Wiki and Tower Defense Simulator Wiki servers",
+  "theme": "almond",
+  "primaryColor": "#5865F2",
+  "lightColor": "#7289DA",
+  "darkColor": "#4752C4",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "setup",
+              "permissions"
+            ]
+          },
+          {
+            "group": "Commands",
+            "pages": [
+              "commands/overview",
+              "commands/moderation",
+              "commands/management",
+              "commands/fun",
+              "commands/wiki-integration"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/fandom-linking",
+              "features/reaction-roles",
+              "features/auto-welcome",
+              "features/inter-server-chat",
+              "features/message-archiving"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/environment",
+              "configuration/role-ids",
+              "configuration/console-commands"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Development",
+        "groups": [
+          {
+            "group": "Development",
+            "pages": [
+              "development/architecture",
+              "development/contributing",
+              "development/command-system"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Discord moderation commands (ban, kick, timeout, warn)",
+    "Message management with archiving",
+    "Fandom wiki account linking and role sync",
+    "Fun commands (aura calculator, battle system, ship compatibility)",
+    "Reaction roles system",
+    "Auto-welcome for new members",
+    "Inter-server chat functionality",
+    "Action ID tracking for moderation",
+    "Top contributors role management",
+    "Russian Roulette game"
+  ],
+  "publicApiSurface": [
+    "/ban - Permanent ban with reason",
+    "/kick - Remove user from server",
+    "/timeout - Temporarily silence users",
+    "/warn - Issue warnings",
+    "/clear - Bulk message deletion with archiving",
+    "/removesin - Reverse punishments by action ID",
+    "/link - Link Discord account to Fandom wiki",
+    "/checklink - Verify and sync Fandom roles",
+    "/syncroles - Sync top contributor roles",
+    "/aura - Calculate user aura score",
+    "/battle - Battle system with rankings",
+    "/ship - Compatibility checker",
+    "/russian - Russian Roulette game",
+    "/reactionrole - Manage reaction roles",
+    "/interchat - Cross-server chat setup",
+    "/archives - View deleted message archives",
+    "/sins - View moderation history",
+    "/help - Command reference",
+    "/info - Bot information",
+    "/avatar - Display user avatars",
+    "/anime - Random anime images",
+    "/oracle - 8ball responses",
+    "/family - Family tree system",
+    "/trivia - Wiki trivia facts",
+    "/slowmode - Channel slowmode control",
+    "/asset - Roblox asset downloader"
+  ]
+}
